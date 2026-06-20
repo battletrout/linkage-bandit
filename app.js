@@ -11,6 +11,7 @@ const selectionStatus = document.querySelector('#selection-status');
 const addManualLinkButton = document.querySelector('#add-manual-link');
 const deleteManualLinkButton = document.querySelector('#delete-manual-link');
 const clearSelectionButton = document.querySelector('#clear-selection');
+const showChanges = document.querySelector('#show-changes');
 const showHardLinks = document.querySelector('#show-hard-links');
 const showManualLinks = document.querySelector('#show-manual-links');
 const changesFileInput = document.querySelector('#changes-file');
@@ -18,13 +19,18 @@ const downloadChangesButton = document.querySelector('#download-changes');
 const configFileInput = document.querySelector('#config-file');
 const downloadConfigButton = document.querySelector('#download-config');
 const hotkeyAddLink = document.querySelector('#hotkey-add-link');
+const hotkeyEditRecord = document.querySelector('#hotkey-edit-record');
 const hotkeyDeleteLink = document.querySelector('#hotkey-delete-link');
 const hotkeyToggleHard = document.querySelector('#hotkey-toggle-hard');
 const hotkeyToggleManual = document.querySelector('#hotkey-toggle-manual');
 const hotkeyClearSelection = document.querySelector('#hotkey-clear-selection');
+const recordEditor = document.querySelector('#record-editor');
+const recordEditorForm = document.querySelector('#record-editor-form');
+const recordEditorFields = document.querySelector('#record-editor-fields');
 const csvViewers = [];
 let relationshipLineFrame;
 let manualLinks = [];
+let recordChanges = [];
 let selectedCards = { left: null, right: null };
 let selectedManualLinkId = null;
 let loadedConfiguration = null;
@@ -165,10 +171,11 @@ class CsvViewer {
     const canDrawRelationships = csvViewers[0]?.headers.length && csvViewers[1]?.headers.length;
     this.cardList.replaceChildren();
     visibleRows.forEach(row => {
+      const displayRow = getDisplayRow(this.side, row);
       const card = document.createElement('article');
       card.className = 'row-card';
       if (canDrawRelationships) {
-        card.dataset.relationshipKey = normalizeRelationshipValue(row[relationshipField]);
+        card.dataset.relationshipKey = normalizeRelationshipValue(displayRow[relationshipField]);
         card.addEventListener('mouseenter', () => highlightRelationship(card.dataset.relationshipKey));
         card.addEventListener('mouseleave', clearRelationshipHighlight);
       }
@@ -179,7 +186,10 @@ class CsvViewer {
         const label = document.createElement('strong');
         field.className = 'field-value';
         label.textContent = `${this.headers[index]} : `;
-        field.append(label, document.createTextNode(row[index] ?? ''));
+        const value = document.createElement('span');
+        value.textContent = displayRow[index] ?? '';
+        if (isFieldChanged(this.side, row, index)) value.className = 'changed-value';
+        field.append(label, value);
         card.append(field);
       });
       if (!selectedFields.length) card.textContent = 'No fields selected.';
@@ -250,6 +260,7 @@ linkageLayout.addEventListener('change', refreshRelationshipDisplay);
 addManualLinkButton.addEventListener('click', addManualLink);
 deleteManualLinkButton.addEventListener('click', deleteSelectedManualLink);
 clearSelectionButton.addEventListener('click', clearSelectedCards);
+showChanges.addEventListener('change', refreshRelationshipDisplay);
 showHardLinks.addEventListener('change', refreshRelationshipDisplay);
 showManualLinks.addEventListener('change', refreshRelationshipDisplay);
 changesFileInput.addEventListener('change', loadChangesFile);
@@ -257,11 +268,13 @@ downloadChangesButton.addEventListener('click', downloadChangesFile);
 configFileInput.addEventListener('change', loadConfigurationFile);
 downloadConfigButton.addEventListener('click', downloadConfigurationFile);
 setupHotkeyRecorder(hotkeyAddLink);
+setupHotkeyRecorder(hotkeyEditRecord);
 setupHotkeyRecorder(hotkeyDeleteLink);
 setupHotkeyRecorder(hotkeyToggleHard);
 setupHotkeyRecorder(hotkeyToggleManual);
 setupHotkeyRecorder(hotkeyClearSelection);
 document.addEventListener('keydown', handleHotkeys);
+recordEditorForm.addEventListener('submit', saveRecordEdit);
 connectionSpace.addEventListener('input', () => {
   setConnectionSpace(Number(connectionSpace.value));
   scheduleRelationshipLineUpdate();
@@ -315,9 +328,12 @@ function updateSelectedCardUi() {
   const canAdd = selectedCards.left && selectedCards.right;
   addManualLinkButton.disabled = !canAdd;
   deleteManualLinkButton.disabled = !selectedManualLinkId;
+  const oneCardSelected = selectedCards.left || selectedCards.right;
   selectionStatus.textContent = canAdd
     ? 'Ready to add a blue linkage between the selected cards.'
-    : 'Select one card on each side to add a linkage.';
+    : oneCardSelected
+      ? 'Record selected. Press the edit hotkey to change visible fields.'
+      : 'Select one card on each side to add a linkage.';
 }
 
 function selectManualLink(linkId) {
@@ -363,6 +379,65 @@ function getRecordKey(row) {
   return JSON.stringify(row ?? []);
 }
 
+function getRecordChange(side, row) {
+  return recordChanges.find(change => change.side === side && getRecordKey(change.record) === getRecordKey(row));
+}
+
+function getDisplayRow(side, row) {
+  if (!showChanges.checked) return row;
+  const change = getRecordChange(side, row);
+  if (!change) return row;
+  return row.map((value, index) => Object.hasOwn(change.fields, index) ? change.fields[index] : value);
+}
+
+function isFieldChanged(side, row, index) {
+  return showChanges.checked && Boolean(getRecordChange(side, row)?.fields?.[index] !== undefined);
+}
+
+function editSelectedRecord() {
+  const selected = selectedCards.left || selectedCards.right;
+  if (!selected || selectedCards.left && selectedCards.right) return;
+  const viewer = csvViewers.find(candidate => candidate.side === (selectedCards.left ? 'left' : 'right'));
+  const visibleIndexes = [...viewer.fieldList.querySelectorAll('input:checked')].map(input => Number(input.value));
+  const displayRow = getDisplayRow(viewer.side, selected.recordValues);
+  recordEditorFields.replaceChildren();
+  visibleIndexes.forEach(index => {
+    const label = document.createElement('label');
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = displayRow[index] ?? '';
+    input.dataset.fieldIndex = index;
+    label.append(document.createTextNode(viewer.headers[index]), input);
+    recordEditorFields.append(label);
+  });
+  recordEditor.dataset.side = viewer.side;
+  recordEditor.recordValues = selected.recordValues;
+  recordEditor.showModal();
+  recordEditorFields.querySelector('input')?.focus();
+}
+
+function saveRecordEdit(event) {
+  if (event.submitter?.value !== 'save') return;
+  const side = recordEditor.dataset.side;
+  const record = recordEditor.recordValues;
+  if (!side || !record) return;
+  const fields = {};
+  recordEditorFields.querySelectorAll('input').forEach(input => {
+    const index = Number(input.dataset.fieldIndex);
+    if (input.value !== (record[index] ?? '')) fields[index] = input.value;
+  });
+  const existingIndex = recordChanges.findIndex(change => change.side === side && getRecordKey(change.record) === getRecordKey(record));
+  if (Object.keys(fields).length) {
+    const change = { side, record: record.slice(), fields };
+    if (existingIndex >= 0) recordChanges[existingIndex] = change;
+    else recordChanges.push(change);
+  } else if (existingIndex >= 0) {
+    recordChanges.splice(existingIndex, 1);
+  }
+  showChanges.checked = true;
+  refreshRelationshipDisplay();
+}
+
 async function loadChangesFile() {
   const [file] = changesFileInput.files;
   if (!file) return;
@@ -372,6 +447,10 @@ async function loadChangesFile() {
       throw new Error('This is not a supported changes file.');
     }
     manualLinks = changes.manualLinks.filter(link => Array.isArray(link.leftRow) && Array.isArray(link.rightRow));
+    recordChanges = Array.isArray(changes.recordChanges)
+      ? changes.recordChanges.filter(change => ['left', 'right'].includes(change.side)
+        && Array.isArray(change.record) && change.fields && typeof change.fields === 'object')
+      : [];
     scheduleRelationshipLineUpdate();
   } catch (error) {
     alert(`Could not load changes: ${error.message}`);
@@ -381,7 +460,7 @@ async function loadChangesFile() {
 }
 
 function downloadChangesFile() {
-  downloadTextFile(getWorkspaceFileName('changes'), JSON.stringify({ format: 'changes-v1', manualLinks }, null, 2));
+  downloadTextFile(getWorkspaceFileName('changes'), JSON.stringify({ format: 'changes-v1', manualLinks, recordChanges }, null, 2));
 }
 
 async function loadConfigurationFile() {
@@ -414,11 +493,13 @@ function downloadConfigurationFile() {
       rightMatchField: rightViewer.headers[Number(rightMatchField.value)] ?? '',
       connectionSpace: Number(connectionSpace.value),
       linkageLayout: linkageLayout.value,
+      showChanges: showChanges.checked,
       showHardLinks: showHardLinks.checked,
       showManualLinks: showManualLinks.checked,
     },
     hotkeys: {
       addLink: hotkeyAddLink.value,
+      editRecord: hotkeyEditRecord.value,
       deleteLink: hotkeyDeleteLink.value,
       toggleHard: hotkeyToggleHard.value,
       toggleManual: hotkeyToggleManual.value,
@@ -484,6 +565,7 @@ function applyRelationshipConfiguration() {
     ? configuration.linkageLayout : 'none';
   const space = Number(configuration.connectionSpace);
   if (Number.isFinite(space)) setConnectionSpace(space);
+  showChanges.checked = configuration.showChanges !== false;
   showHardLinks.checked = configuration.showHardLinks !== false;
   showManualLinks.checked = configuration.showManualLinks !== false;
 }
@@ -492,6 +574,7 @@ function applyHotkeyConfiguration() {
   const hotkeys = loadedConfiguration?.hotkeys;
   if (!hotkeys) return;
   if (typeof hotkeys.addLink === 'string' && hotkeys.addLink) hotkeyAddLink.value = hotkeys.addLink;
+  if (typeof hotkeys.editRecord === 'string' && hotkeys.editRecord) hotkeyEditRecord.value = hotkeys.editRecord;
   if (typeof hotkeys.deleteLink === 'string' && hotkeys.deleteLink) hotkeyDeleteLink.value = hotkeys.deleteLink;
   if (typeof hotkeys.toggleHard === 'string' && hotkeys.toggleHard) hotkeyToggleHard.value = hotkeys.toggleHard;
   if (typeof hotkeys.toggleManual === 'string' && hotkeys.toggleManual) hotkeyToggleManual.value = hotkeys.toggleManual;
@@ -534,6 +617,10 @@ function handleHotkeys(event) {
   if (formatHotkey(event) === hotkeyAddLink.value) {
     event.preventDefault();
     addManualLink();
+  }
+  if (formatHotkey(event) === hotkeyEditRecord.value) {
+    event.preventDefault();
+    editSelectedRecord();
   }
   if (formatHotkey(event) === hotkeyDeleteLink.value) {
     event.preventDefault();
@@ -601,7 +688,7 @@ function drawRelationshipLines() {
 
   const leftCardsByRecord = getCardsByRecord(leftViewer.cardList);
   const rightCardsByRecord = getCardsByRecord(rightViewer.cardList);
-  if (showManualLinks.checked) {
+  if (showChanges.checked && showManualLinks.checked) {
     manualLinks.forEach(link => {
       const leftCards = leftCardsByRecord.get(getRecordKey(link.leftRow)) ?? [];
       const rightCards = rightCardsByRecord.get(getRecordKey(link.rightRow)) ?? [];
@@ -645,7 +732,7 @@ function rowsAreLinked(firstRow, firstSide, secondRow, secondSide) {
   const leftValue = normalizeRelationshipValue(leftRow[Number(leftMatchField.value)]);
   const rightValue = normalizeRelationshipValue(rightRow[Number(rightMatchField.value)]);
   const hardLink = showHardLinks.checked && leftValue && leftValue === rightValue;
-  const manualLink = showManualLinks.checked && manualLinks.some(link =>
+  const manualLink = showChanges.checked && showManualLinks.checked && manualLinks.some(link =>
     getRecordKey(link.leftRow) === getRecordKey(leftRow)
     && getRecordKey(link.rightRow) === getRecordKey(rightRow));
   return hardLink || manualLink;
