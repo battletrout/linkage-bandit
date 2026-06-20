@@ -18,6 +18,7 @@ const changesFileInput = document.querySelector('#changes-file');
 const saveChangesButton = document.querySelector('#save-changes');
 const configFileInput = document.querySelector('#config-file');
 const saveConfigButton = document.querySelector('#save-config');
+const resetConfigButton = document.querySelector('#reset-config');
 const hotkeyAddLink = document.querySelector('#hotkey-add-link');
 const hotkeyEditRecord = document.querySelector('#hotkey-edit-record');
 const hotkeyToggleChanges = document.querySelector('#hotkey-toggle-changes');
@@ -33,6 +34,10 @@ const recordEditorForm = document.querySelector('#record-editor-form');
 const recordEditorFields = document.querySelector('#record-editor-fields');
 const configurationStatus = document.querySelector('#configuration-status');
 const configurationMessage = document.querySelector('#configuration-message');
+const openSettingsButton = document.querySelector('#open-settings');
+const closeSettingsButton = document.querySelector('#close-settings');
+const settingsDrawer = document.querySelector('#settings-drawer');
+const workspaceSummary = document.querySelector('#workspace-summary');
 const csvViewers = [];
 let relationshipLineFrame;
 let manualLinks = [];
@@ -41,6 +46,8 @@ let selectedCards = { left: null, right: null };
 let selectedManualLinkId = null;
 let loadedConfiguration = null;
 let loadedChangesFileName = '';
+let changesDirty = false;
+let configDirty = false;
 
 function createViewer(title, side) {
   const viewer = viewerTemplate.content.firstElementChild.cloneNode(true);
@@ -130,11 +137,13 @@ class CsvViewer {
       updateRelationshipControls();
       scheduleRelationshipLineUpdate();
       updateConfigurationStatus();
+      updateWorkspaceSummary();
     } catch (error) {
       this.status.classList.add('error');
       this.status.textContent = `Could not read this CSV: ${error.message}`;
       updateRelationshipControls();
       updateConfigurationStatus();
+      updateWorkspaceSummary();
     }
   }
 
@@ -146,7 +155,7 @@ class CsvViewer {
       checkbox.type = 'checkbox';
       checkbox.value = index;
       checkbox.checked = true;
-      checkbox.addEventListener('change', () => this.updateDisplay());
+      checkbox.addEventListener('change', () => { markConfigDirty(); this.updateDisplay(); });
       option.className = 'field-option';
       option.append(checkbox, document.createTextNode(header));
       this.fieldList.append(option);
@@ -164,6 +173,7 @@ class CsvViewer {
 
   setAllFields(checked) {
     this.fieldList.querySelectorAll('input').forEach(input => { input.checked = checked; });
+    markConfigDirty();
     this.updateDisplay();
   }
 
@@ -212,6 +222,8 @@ class CsvViewer {
       empty.textContent = 'No rows match this filter.';
       this.cardList.append(empty);
     }
+
+    getOrphanRecords(this.side).forEach(row => this.cardList.append(createGhostCard(this, row)));
     this.status.textContent = `${visibleRows.length} of ${this.dataRows.length} row${this.dataRows.length === 1 ? '' : 's'} shown from ${this.fileName}.`;
     scheduleRelationshipLineUpdate();
   }
@@ -264,19 +276,22 @@ class CsvViewer {
 createViewer('CSV A', 'left');
 createViewer('CSV B', 'right');
 
-leftMatchField.addEventListener('change', refreshRelationshipDisplay);
-rightMatchField.addEventListener('change', refreshRelationshipDisplay);
-linkageLayout.addEventListener('change', refreshRelationshipDisplay);
+leftMatchField.addEventListener('change', () => { markConfigDirty(); refreshRelationshipDisplay(); });
+rightMatchField.addEventListener('change', () => { markConfigDirty(); refreshRelationshipDisplay(); });
+linkageLayout.addEventListener('change', () => { markConfigDirty(); refreshRelationshipDisplay(); });
 addManualLinkButton.addEventListener('click', addManualLink);
 deleteManualLinkButton.addEventListener('click', deleteSelectedManualLink);
 clearSelectionButton.addEventListener('click', clearSelectedCards);
-showChanges.addEventListener('change', refreshRelationshipDisplay);
-showHardLinks.addEventListener('change', refreshRelationshipDisplay);
-showManualLinks.addEventListener('change', refreshRelationshipDisplay);
+showChanges.addEventListener('change', () => { markConfigDirty(); refreshRelationshipDisplay(); });
+showHardLinks.addEventListener('change', () => { markConfigDirty(); refreshRelationshipDisplay(); });
+showManualLinks.addEventListener('change', () => { markConfigDirty(); refreshRelationshipDisplay(); });
 changesFileInput.addEventListener('change', loadChangesFile);
 saveChangesButton.addEventListener('click', () => saveChangesFile(getWorkspaceFileName('changes')));
 configFileInput.addEventListener('change', loadConfigurationFile);
 saveConfigButton.addEventListener('click', () => saveConfigurationFile(getWorkspaceFileName('config')));
+resetConfigButton.addEventListener('click', () => { if (loadedConfiguration) applyConfigurationToWorkspace(); });
+openSettingsButton.addEventListener('click', () => { settingsDrawer.hidden = false; });
+closeSettingsButton.addEventListener('click', () => { settingsDrawer.hidden = true; });
 hideHotkeysButton.addEventListener('click', () => setHotkeyMenuVisibility(false));
 showHotkeysButton.addEventListener('click', () => setHotkeyMenuVisibility(true));
 setupHotkeyRecorder(hotkeyAddLink);
@@ -289,11 +304,17 @@ setupHotkeyRecorder(hotkeyClearSelection);
 document.addEventListener('keydown', handleHotkeys);
 recordEditorForm.addEventListener('submit', saveRecordEdit);
 connectionSpace.addEventListener('input', () => {
+  markConfigDirty();
   setConnectionSpace(Number(connectionSpace.value));
   scheduleRelationshipLineUpdate();
 });
 window.addEventListener('resize', scheduleRelationshipLineUpdate);
 window.addEventListener('scroll', scheduleRelationshipLineUpdate, true);
+window.addEventListener('beforeunload', event => {
+  if (!changesDirty && !configDirty) return;
+  event.preventDefault();
+  event.returnValue = '';
+});
 
 function updateRelationshipControls() {
   const [leftViewer, rightViewer] = csvViewers;
@@ -352,7 +373,7 @@ function updateSelectedCardUi() {
 function selectManualLink(linkId) {
   selectedManualLinkId = linkId;
   selectedCards = { left: null, right: null };
-  document.querySelectorAll('.relationship-line.manual-link').forEach(line => {
+  document.querySelectorAll('.relationship-line.manual-link, .relationship-line.ghost-link').forEach(line => {
     line.classList.toggle('relationship-link-selected', line.dataset.manualLinkId === linkId);
   });
   updateSelectedCardUi();
@@ -372,6 +393,7 @@ function addManualLink() {
       leftRow: leftRow.slice(),
       rightRow: rightRow.slice(),
     });
+    markChangesDirty();
   }
   clearSelectedCards();
   scheduleRelationshipLineUpdate();
@@ -380,6 +402,7 @@ function addManualLink() {
 function deleteSelectedManualLink() {
   if (!selectedManualLinkId) return;
   manualLinks = manualLinks.filter(link => link.id !== selectedManualLinkId);
+  markChangesDirty();
   clearSelectedCards();
   refreshRelationshipDisplay();
 }
@@ -390,6 +413,40 @@ function createChangeId() {
 
 function getRecordKey(row) {
   return JSON.stringify(row ?? []);
+}
+
+function getOrphanRecords(side) {
+  const viewer = csvViewers.find(candidate => candidate.side === side);
+  const existingRecords = new Set((viewer?.dataRows ?? []).map(getRecordKey));
+  const orphanRecords = [];
+  recordChanges.filter(change => change.side === side).forEach(change => {
+    if (!existingRecords.has(getRecordKey(change.record))) orphanRecords.push(change.record);
+  });
+  manualLinks.forEach(link => {
+    const record = side === 'left' ? link.leftRow : link.rightRow;
+    if (!existingRecords.has(getRecordKey(record))) orphanRecords.push(record);
+  });
+  return [...new Map(orphanRecords.map(record => [getRecordKey(record), record])).values()];
+}
+
+function createGhostCard(viewer, row) {
+  const card = document.createElement('article');
+  card.className = 'row-card ghost-record';
+  card.recordValues = row.slice();
+  card.isGhost = true;
+  const note = document.createElement('p');
+  note.className = 'ghost-note';
+  note.textContent = 'Ghost record — expected by changes but missing from this dataset.';
+  card.append(note);
+  viewer.headers.slice(0, 3).forEach((header, index) => {
+    const field = document.createElement('div');
+    const label = document.createElement('strong');
+    field.className = 'field-value';
+    label.textContent = `${header} : `;
+    field.append(label, document.createTextNode(row[index] ?? ''));
+    card.append(field);
+  });
+  return card;
 }
 
 function getRecordChange(side, row) {
@@ -447,6 +504,7 @@ function saveRecordEdit(event) {
   } else if (existingIndex >= 0) {
     recordChanges.splice(existingIndex, 1);
   }
+  markChangesDirty();
   showChanges.checked = true;
   refreshRelationshipDisplay();
 }
@@ -456,7 +514,7 @@ async function loadChangesFile() {
   if (!file) return;
   try {
     const changes = JSON.parse(await file.text());
-    if (changes?.format !== 'changes-v1' || !Array.isArray(changes.manualLinks)) {
+    if (!isValidChangesDocument(changes)) {
       throw new Error('This is not a supported changes file.');
     }
     manualLinks = changes.manualLinks.filter(link => Array.isArray(link.leftRow) && Array.isArray(link.rightRow));
@@ -465,8 +523,10 @@ async function loadChangesFile() {
         && Array.isArray(change.record) && change.fields && typeof change.fields === 'object')
       : [];
     loadedChangesFileName = getCrossPlatformFileName(file.name);
+    changesDirty = false;
     scheduleRelationshipLineUpdate();
     updateConfigurationStatus();
+    updateWorkspaceSummary();
   } catch (error) {
     alert(`Could not load changes: ${error.message}`);
   } finally {
@@ -478,6 +538,8 @@ function saveChangesFile(fileName) {
   loadedChangesFileName = fileName;
   updateInMemoryFileConfiguration(fileName);
   downloadTextFile(fileName, JSON.stringify({ format: 'changes-v1', manualLinks, recordChanges }, null, 2));
+  changesDirty = false;
+  updateWorkspaceSummary();
   updateConfigurationStatus();
 }
 
@@ -486,12 +548,14 @@ async function loadConfigurationFile() {
   if (!file) return;
   try {
     const configuration = JSON.parse(await file.text());
-    if (configuration?.format !== 'relationship-config-v1') {
+    if (!isValidConfigurationDocument(configuration)) {
       throw new Error('This is not a supported configuration file.');
     }
     loadedConfiguration = configuration;
+    configDirty = false;
     applyConfigurationToWorkspace();
     updateConfigurationStatus();
+    updateWorkspaceSummary();
   } catch (error) {
     alert(`Could not load configuration: ${error.message}`);
   } finally {
@@ -537,6 +601,8 @@ function saveConfigurationFile(fileName) {
   loadedConfiguration = configuration;
   downloadTextFile(fileName, JSON.stringify(configuration, null, 2));
   updateConfigurationStatus();
+  configDirty = false;
+  updateWorkspaceSummary();
 }
 
 function getWorkspaceFileName(extension) {
@@ -544,6 +610,20 @@ function getWorkspaceFileName(extension) {
   const leftName = getFileNameWithExtension(leftViewer?.fileName || 'left', '');
   const rightName = getFileNameWithExtension(rightViewer?.fileName || 'right', '');
   return `${leftName}--${rightName}.${extension}`;
+}
+
+function isValidChangesDocument(changes) {
+  return changes?.format === 'changes-v1'
+    && Array.isArray(changes.manualLinks)
+    && (!changes.recordChanges || Array.isArray(changes.recordChanges));
+}
+
+function isValidConfigurationDocument(configuration) {
+  return configuration?.format === 'relationship-config-v1'
+    && (!configuration.files || typeof configuration.files === 'object')
+    && (!configuration.viewers || typeof configuration.viewers === 'object')
+    && (!configuration.relationship || typeof configuration.relationship === 'object')
+    && (!configuration.hotkeys || typeof configuration.hotkeys === 'object');
 }
 
 function updateInMemoryFileConfiguration(changesFileName) {
@@ -606,6 +686,26 @@ function updateConfigurationStatus() {
   configurationMessage.textContent = missing.length
     ? missing.join(' ')
     : 'Configured files loaded successfully.';
+}
+
+function markChangesDirty() {
+  changesDirty = true;
+  updateWorkspaceSummary();
+}
+
+function markConfigDirty() {
+  configDirty = true;
+  updateWorkspaceSummary();
+}
+
+function updateWorkspaceSummary() {
+  const states = [];
+  if (loadedConfiguration) states.push('config loaded');
+  if (changesDirty) states.push('unsaved changes');
+  if (configDirty) states.push('unsaved config');
+  const orphanCount = getOrphanRecords('left').length + getOrphanRecords('right').length;
+  if (orphanCount) states.push(`${orphanCount} unresolved record${orphanCount === 1 ? '' : 's'}`);
+  workspaceSummary.textContent = states.length ? states.join(' · ') : 'New workspace';
 }
 
 function applyViewerConfiguration(viewer) {
@@ -684,6 +784,7 @@ function setupHotkeyRecorder(input) {
     event.preventDefault();
     if (isModifierKey(event.key)) return;
     input.value = formatHotkey(event);
+    markConfigDirty();
     input.blur();
   });
 }
@@ -774,7 +875,7 @@ function drawRelationshipLines() {
       const leftCards = leftCardsByRecord.get(getRecordKey(link.leftRow)) ?? [];
       const rightCards = rightCardsByRecord.get(getRecordKey(link.rightRow)) ?? [];
       leftCards.forEach(leftCard => rightCards.forEach(rightCard => {
-        addRelationshipLine(leftCard, rightCard, link.id, canvas, 'manual');
+        addRelationshipLine(leftCard, rightCard, link.id, canvas, leftCard.isGhost || rightCard.isGhost ? 'ghost' : 'manual');
       }));
     });
   }
@@ -849,16 +950,16 @@ function addRelationshipLine(leftCard, rightCard, key, canvas, type) {
   const endY = right.top + right.height / 2 - canvas.top;
   const bend = Math.max(36, (endX - startX) * .35);
   const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  line.classList.add('relationship-line', type === 'manual' ? 'manual-link' : 'hard-link');
-  line.dataset.relationshipKey = type === 'manual' ? `manual-${key}` : key;
-  if (type === 'manual') line.dataset.manualLinkId = key;
+  line.classList.add('relationship-line', type === 'ghost' ? 'ghost-link' : type === 'manual' ? 'manual-link' : 'hard-link');
+  line.dataset.relationshipKey = type === 'manual' || type === 'ghost' ? `manual-${key}` : key;
+  if (type === 'manual' || type === 'ghost') line.dataset.manualLinkId = key;
   line.setAttribute('d', `M ${startX} ${startY} C ${startX + bend} ${startY}, ${endX - bend} ${endY}, ${endX} ${endY}`);
   line.addEventListener('mouseenter', () => {
-    if (type === 'manual') highlightManualLink(leftCard, rightCard, line);
+    if (type === 'manual' || type === 'ghost') highlightManualLink(leftCard, rightCard, line);
     else highlightRelationship(line.dataset.relationshipKey);
   });
   line.addEventListener('mouseleave', clearRelationshipHighlight);
-  if (type === 'manual') line.addEventListener('click', event => {
+  if (type === 'manual' || type === 'ghost') line.addEventListener('click', event => {
     event.stopPropagation();
     selectManualLink(key);
   });

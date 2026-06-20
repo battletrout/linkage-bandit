@@ -12,20 +12,29 @@
         <p class="eyebrow">Local CSV comparer</p>
         <h1>Rows, neatly boxed.</h1>
         <p class="intro">Load two CSV files side by side. Each file has its own fields, filters, and sorting.</p>
+        <div class="workspace-bar">
+          <span id="workspace-summary">New workspace</span>
+          <button id="open-settings" class="secondary-button" type="button">Workspace settings</button>
+        </div>
       </header>
 
-      <section id="configuration-status" class="configuration-status" aria-live="polite">
-        <strong>Configuration</strong>
-        <span id="configuration-message">No configuration loaded.</span>
-      </section>
-
-      <section id="relationship-controls" class="relationship-controls" hidden aria-labelledby="relationship-heading">
-        <div>
-          <p class="eyebrow">Relationship</p>
-          <h2 id="relationship-heading">Match rows by field</h2>
+      <aside id="settings-drawer" class="settings-drawer" hidden aria-label="Workspace settings">
+        <div class="settings-drawer-heading"><div><p class="eyebrow">Workspace settings</p><h2>Configuration</h2></div><button id="close-settings" class="secondary-button" type="button">Close</button></div>
+        <section class="settings-section">
+          <h3>Data</h3>
+          <section id="configuration-status" class="configuration-status" aria-live="polite"><strong>Configuration</strong><span id="configuration-message">No configuration loaded.</span></section>
+          <div class="workspace-files">
+            <label class="workspace-file-picker">Load changes<input id="changes-file" type="file" accept=".changes" /></label>
+            <button id="save-changes" class="secondary-button" type="button">Save changes</button>
+            <label class="workspace-file-picker">Load config<input id="config-file" type="file" accept=".config" /></label>
+            <button id="save-config" class="secondary-button" type="button">Save config</button>
+            <button id="reset-config" class="secondary-button" type="button">Reset to config</button>
+          </div>
+        </section>
+        <section id="relationship-controls" class="settings-section" hidden aria-labelledby="relationship-heading">
+          <h3 id="relationship-heading">Links</h3>
           <p class="relationship-hint">Choose the columns whose values identify the same item in each CSV.</p>
-        </div>
-        <div class="relationship-selectors">
+          <div class="relationship-selectors">
           <label>
             CSV A field
             <select id="left-match-field"></select>
@@ -47,25 +56,21 @@
               <option value="anchor-b">Anchor CSV B / group CSV A</option>
             </select>
           </label>
-        </div>
-        <div class="relationship-actions">
+          </div>
+          <div class="relationship-actions">
           <span id="selection-status">Select one card on each side to add a linkage.</span>
           <button id="add-manual-link" class="secondary-button" type="button" disabled>Add linkage</button>
           <button id="delete-manual-link" class="secondary-button" type="button" disabled>Delete blue link</button>
           <button id="clear-selection" class="secondary-button" type="button">Clear selection</button>
-        </div>
-        <div class="link-visibility" aria-label="Visible link types">
+          </div>
+          <div class="link-visibility" aria-label="Visible link types">
           <label><input id="show-changes" type="checkbox" checked /> Apply changes</label>
           <label><input id="show-hard-links" type="checkbox" checked /> Show black CSV links</label>
           <label><input id="show-manual-links" type="checkbox" checked /> Show blue added links</label>
-        </div>
-        <div class="workspace-files">
-          <label class="workspace-file-picker">Load changes<input id="changes-file" type="file" accept=".changes" /></label>
-          <button id="save-changes" class="secondary-button" type="button">Save changes</button>
-          <label class="workspace-file-picker">Load config<input id="config-file" type="file" accept=".config" /></label>
-          <button id="save-config" class="secondary-button" type="button">Save config</button>
-        </div>
-      </section>
+          </div>
+        </section>
+        <section class="settings-section"><h3>Appearance</h3><p>Use connection space and linkage layout above to control visual density and grouping. Hotkey visibility is saved with this workspace.</p></section>
+      </aside>
 
       <div id="viewers" class="viewers">
         <svg id="relationship-lines" class="relationship-lines" aria-hidden="true"></svg>

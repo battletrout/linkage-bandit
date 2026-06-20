@@ -1,7 +1,6 @@
 TestCase ID,Description,Execution steps
 TC-C2001,Verify user authentication with approved credentials,1. Open the sign-in page. ; 2. Enter a valid approved username and password. ; 3. Select Sign In. ; 4. Verify access to the authorized landing page.
 TC-C2002,Verify role-based access control for protected functions,1. Sign in as a user without administrator privileges. ; 2. Attempt to open an administrator-only function. ; 3. Verify access is denied. ; 4. Sign in as an administrator. ; 5. Verify the function is accessible.
-TC-C2003,Verify audit logging of sign-in attempts,"1. Attempt one successful sign-in and one failed sign-in. ; 2. Open the audit log as an authorized user. ; 3. Locate both events. ; 4. Verify each entry includes user, timestamp, and outcome."
 TC-C2004,Verify account lockout after repeated failed sign-ins,1. Use a valid user account. ; 2. Enter an incorrect password five times. ; 3. Attempt a sixth sign-in. ; 4. Verify the account is locked and a clear message is displayed.
 TC-C2005,Verify administrator password reset,1. Sign in as an administrator. ; 2. Select a test user account. ; 3. Initiate a password reset. ; 4. Verify the reset is recorded. ; 5. Verify the user can sign in using the temporary password.
 TC-C2006,Verify password complexity enforcement,1. Start a password change. ; 2. Enter a password that violates the configured policy. ; 3. Submit the change. ; 4. Verify the password is rejected with a validation message.
