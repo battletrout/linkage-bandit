@@ -1,4 +1,6 @@
-# Linkage Bandit
+<h1><img src="logo.png" alt="Linkage Bandit logo" width="56" align="absmiddle"> Linkage Bandit</h1>
+
+[![Deploy Linkage Bandit to GitHub Pages](https://github.com/battletrout/linkage-bandit/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/battletrout/linkage-bandit/actions/workflows/deploy-pages.yml)
 
 Linkage Bandit is a browser-based workspace for comparing two datasets, visualizing and editing simple relationships, and safely recording changes. It runs entirely in your browser: source files remain local, and your work is stored in portable sidecar files. 
 
@@ -6,7 +8,7 @@ I created Linkage Bandit wanted a fast tool to visualize traceability between so
 
 ## Getting started
 
-1. Open `index.html` in a modern browser, or use the GitHub Pages site.
+1. Open `index.html` in a modern browser, or use the GitHub Pages site at https://battletrout.github.io/linkage-bandit/.
 2. Load a CSV or Linkage Bandit JSON file into **Data A** and **Data B**.
 3. For CSV imports, choose Auto-detect or specify the delimiter.
 4. Open **Workspace settings**, then select the fields that identify relationships between the datasets.
