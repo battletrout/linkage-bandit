@@ -79,7 +79,7 @@ class CsvViewer {
 
       this.headers = rows[0].map((header, index) => header.trim() || `Column ${index + 1}`);
       this.dataRows = rows.slice(1).filter(row => row.some(value => value.trim() !== ''));
-      this.fileName = file.name;
+      this.fileName = getCrossPlatformFileName(file.name);
       this.buildFieldPicker();
       this.buildDataControls();
       this.renderCards();
@@ -206,7 +206,7 @@ class CsvViewer {
     const url = URL.createObjectURL(jsonFile);
     const download = document.createElement('a');
     download.href = url;
-    download.download = this.fileName.replace(/\.csv$/i, '') + '.json';
+    download.download = getJsonFileName(this.fileName);
     download.click();
     setTimeout(() => URL.revokeObjectURL(url), 0);
   }
@@ -366,6 +366,17 @@ function clearRelationshipHighlight() {
 
 function normalizeRelationshipValue(value) {
   return (value ?? '').trim().toLocaleLowerCase();
+}
+
+function getCrossPlatformFileName(filePath) {
+  const fileName = String(filePath ?? '').split(/[\\/]/).pop();
+  return fileName || 'untitled.csv';
+}
+
+function getJsonFileName(filePath) {
+  const fileName = getCrossPlatformFileName(filePath);
+  const baseName = fileName.replace(/\.[^.]*$/, '');
+  return `${baseName || 'untitled'}.json`;
 }
 
 function compareValues(first, second) {
