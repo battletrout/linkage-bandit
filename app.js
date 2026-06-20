@@ -16,9 +16,10 @@ const configFileInput = document.querySelector('#config-file');
 const saveConfigButton = document.querySelector('#save-config');
 const resetConfigButton = document.querySelector('#reset-config');
 const hotkeyAddLink = document.querySelector('#hotkey-add-link');
+const hotkeyAddLinkedRecord = document.querySelector('#hotkey-add-linked-record');
+const hotkeyDeleteRecord = document.querySelector('#hotkey-delete-record');
 const hotkeyEditRecord = document.querySelector('#hotkey-edit-record');
 const hotkeyToggleChanges = document.querySelector('#hotkey-toggle-changes');
-const hotkeyDeleteLink = document.querySelector('#hotkey-delete-link');
 const hotkeyToggleHard = document.querySelector('#hotkey-toggle-hard');
 const hotkeyToggleSettings = document.querySelector('#hotkey-toggle-settings');
 const hotkeyClearSelection = document.querySelector('#hotkey-clear-selection');
@@ -39,6 +40,7 @@ let relationshipLineFrame;
 let manualLinks = [];
 let recordChanges = [];
 let addedRecords = [];
+let deletedRecords = [];
 let selectedCards = { left: null, right: null };
 let selectedManualLinkId = null;
 let loadedConfiguration = null;
@@ -196,6 +198,13 @@ class CsvViewer {
       const card = document.createElement('article');
       card.className = 'row-card';
       if (isAddedRecord(this.side, row)) card.classList.add('added-record');
+      if (isDeletedRecord(this.side, row)) {
+        card.classList.add('marked-deletion');
+        const note = document.createElement('p');
+        note.className = 'deletion-note';
+        note.textContent = 'Marked for deletion';
+        card.append(note);
+      }
       if (canDrawRelationships) {
         card.dataset.relationshipKey = normalizeRelationshipValue(displayRow[relationshipField]);
         card.addEventListener('mouseenter', () => highlightRelationship(card.dataset.relationshipKey));
@@ -294,9 +303,10 @@ closeSettingsButton.addEventListener('click', () => { settingsDrawer.hidden = tr
 hideHotkeysButton.addEventListener('click', () => setHotkeyMenuVisibility(false));
 showHotkeysButton.addEventListener('click', () => setHotkeyMenuVisibility(true));
 setupHotkeyRecorder(hotkeyAddLink);
+setupHotkeyRecorder(hotkeyAddLinkedRecord);
+setupHotkeyRecorder(hotkeyDeleteRecord);
 setupHotkeyRecorder(hotkeyEditRecord);
 setupHotkeyRecorder(hotkeyToggleChanges);
-setupHotkeyRecorder(hotkeyDeleteLink);
 setupHotkeyRecorder(hotkeyToggleHard);
 setupHotkeyRecorder(hotkeyToggleSettings);
 setupHotkeyRecorder(hotkeyClearSelection);
@@ -398,10 +408,19 @@ function addManualLink() {
 
 function deleteSelectedManualLink() {
   if (!selectedManualLinkId) return;
+  if (!window.confirm('Are you sure you want to delete this new linkage?')) return;
   manualLinks = manualLinks.filter(link => link.id !== selectedManualLinkId);
   markChangesDirty();
   clearSelectedCards();
   refreshRelationshipDisplay();
+}
+
+function deleteSelectedItem() {
+  if (selectedManualLinkId) {
+    deleteSelectedManualLink();
+    return;
+  }
+  deleteSelectedRecord();
 }
 
 function createChangeId() {
@@ -420,20 +439,65 @@ function isAddedRecord(side, row) {
   return showChanges.checked && addedRecords.some(record => record.side === side && getRecordKey(record.record) === getRecordKey(row));
 }
 
-function openNewRecordEditor(viewer) {
+function isDeletedRecord(side, row) {
+  return showChanges.checked && deletedRecords.some(record => record.side === side && getRecordKey(record.record) === getRecordKey(row));
+}
+
+function deleteSelectedRecord() {
+  const selected = selectedCards.left || selectedCards.right;
+  if (!selected || selectedCards.left && selectedCards.right) return;
+  const side = selectedCards.left ? 'left' : 'right';
+  const row = selected.recordValues;
+  const isNewRecord = isAddedRecord(side, row);
+  const confirmation = isNewRecord
+    ? 'Are you sure you want to delete this new record and all associated linkages?'
+    : 'Are you sure you want to delete this record?';
+  if (!window.confirm(confirmation)) return;
+  if (isNewRecord) {
+    addedRecords = addedRecords.filter(record => !(record.side === side && getRecordKey(record.record) === getRecordKey(row)));
+    manualLinks = manualLinks.filter(link => {
+      const linkedRow = side === 'left' ? link.leftRow : link.rightRow;
+      return getRecordKey(linkedRow) !== getRecordKey(row);
+    });
+    recordChanges = recordChanges.filter(change => !(change.side === side && getRecordKey(change.record) === getRecordKey(row)));
+  } else if (!isDeletedRecord(side, row)) {
+    deletedRecords.push({ side, record: row.slice() });
+  }
+  markChangesDirty();
+  clearSelectedCards();
+  refreshRelationshipDisplay();
+}
+
+function addLinkedRecord() {
+  const selected = selectedCards.left || selectedCards.right;
+  if (!selected || selectedCards.left && selectedCards.right) return;
+  const selectedSide = selectedCards.left ? 'left' : 'right';
+  const targetViewer = csvViewers.find(viewer => viewer.side !== selectedSide);
+  openNewRecordEditor(targetViewer, { side: selectedSide, record: selected.recordValues });
+}
+
+function openNewRecordEditor(viewer, linkedRecord = null) {
   const visibleIndexes = [...viewer.fieldList.querySelectorAll('input:checked')].map(input => Number(input.value));
+  const defaultRecord = new Array(viewer.headers.length).fill('');
+  if (linkedRecord) {
+    const sourceField = linkedRecord.side === 'left' ? Number(leftMatchField.value) : Number(rightMatchField.value);
+    const targetField = viewer.side === 'left' ? Number(leftMatchField.value) : Number(rightMatchField.value);
+    defaultRecord[targetField] = linkedRecord.record[sourceField] ?? '';
+  }
   recordEditorFields.replaceChildren();
   visibleIndexes.forEach(index => {
     const label = document.createElement('label');
     const input = document.createElement('input');
     input.type = 'text';
     input.dataset.fieldIndex = index;
+    input.value = defaultRecord[index];
     label.append(document.createTextNode(viewer.headers[index]), input);
     recordEditorFields.append(label);
   });
   recordEditor.dataset.mode = 'add';
   recordEditor.dataset.side = viewer.side;
-  recordEditor.recordValues = new Array(viewer.headers.length).fill('');
+  recordEditor.recordValues = defaultRecord;
+  recordEditor.linkedRecord = linkedRecord;
   recordEditor.querySelector('h2').textContent = `Add record to ${viewer.side === 'left' ? 'CSV A' : 'CSV B'}`;
   recordEditor.showModal();
   recordEditorFields.querySelector('input')?.focus();
@@ -523,6 +587,16 @@ function saveRecordEdit(event) {
       addedRecord[Number(input.dataset.fieldIndex)] = input.value;
     });
     addedRecords.push({ side, record: addedRecord });
+    if (recordEditor.linkedRecord) {
+      const source = recordEditor.linkedRecord;
+      const link = side === 'left'
+        ? { id: createChangeId(), leftRow: addedRecord, rightRow: source.record }
+        : { id: createChangeId(), leftRow: source.record, rightRow: addedRecord };
+      const exists = manualLinks.some(existing => getRecordKey(existing.leftRow) === getRecordKey(link.leftRow)
+        && getRecordKey(existing.rightRow) === getRecordKey(link.rightRow));
+      if (!exists) manualLinks.push(link);
+    }
+    recordEditor.linkedRecord = null;
     markChangesDirty();
     showChanges.checked = true;
     refreshRelationshipDisplay();
@@ -562,6 +636,9 @@ async function loadChangesFile() {
     addedRecords = Array.isArray(changes.addedRecords)
       ? changes.addedRecords.filter(record => ['left', 'right'].includes(record.side) && Array.isArray(record.record))
       : [];
+    deletedRecords = Array.isArray(changes.deletedRecords)
+      ? changes.deletedRecords.filter(record => ['left', 'right'].includes(record.side) && Array.isArray(record.record))
+      : [];
     loadedChangesFileName = getCrossPlatformFileName(file.name);
     changesDirty = false;
     scheduleRelationshipLineUpdate();
@@ -577,7 +654,7 @@ async function loadChangesFile() {
 function saveChangesFile(fileName) {
   loadedChangesFileName = fileName;
   updateInMemoryFileConfiguration(fileName);
-  downloadTextFile(fileName, JSON.stringify({ format: 'changes-v1', manualLinks, recordChanges, addedRecords }, null, 2));
+  downloadTextFile(fileName, JSON.stringify({ format: 'changes-v1', manualLinks, recordChanges, addedRecords, deletedRecords }, null, 2));
   changesDirty = false;
   updateWorkspaceSummary();
   updateConfigurationStatus();
@@ -628,9 +705,10 @@ function saveConfigurationFile(fileName) {
     },
     hotkeys: {
       addLink: hotkeyAddLink.value,
+      addLinkedRecord: hotkeyAddLinkedRecord.value,
+      deleteRecord: hotkeyDeleteRecord.value,
       editRecord: hotkeyEditRecord.value,
       toggleChanges: hotkeyToggleChanges.value,
-      deleteLink: hotkeyDeleteLink.value,
       toggleHard: hotkeyToggleHard.value,
       toggleSettings: hotkeyToggleSettings.value,
       clearSelection: hotkeyClearSelection.value,
@@ -655,7 +733,8 @@ function isValidChangesDocument(changes) {
   return changes?.format === 'changes-v1'
     && Array.isArray(changes.manualLinks)
     && (!changes.recordChanges || Array.isArray(changes.recordChanges))
-    && (!changes.addedRecords || Array.isArray(changes.addedRecords));
+    && (!changes.addedRecords || Array.isArray(changes.addedRecords))
+    && (!changes.deletedRecords || Array.isArray(changes.deletedRecords));
 }
 
 function isValidConfigurationDocument(configuration) {
@@ -782,9 +861,10 @@ function applyHotkeyConfiguration() {
   const hotkeys = loadedConfiguration?.hotkeys;
   if (!hotkeys) return;
   if (typeof hotkeys.addLink === 'string' && hotkeys.addLink) hotkeyAddLink.value = hotkeys.addLink;
+  if (typeof hotkeys.addLinkedRecord === 'string' && hotkeys.addLinkedRecord) hotkeyAddLinkedRecord.value = hotkeys.addLinkedRecord;
+  if (typeof hotkeys.deleteRecord === 'string' && hotkeys.deleteRecord) hotkeyDeleteRecord.value = hotkeys.deleteRecord;
   if (typeof hotkeys.editRecord === 'string' && hotkeys.editRecord) hotkeyEditRecord.value = hotkeys.editRecord;
   if (typeof hotkeys.toggleChanges === 'string' && hotkeys.toggleChanges) hotkeyToggleChanges.value = hotkeys.toggleChanges;
-  if (typeof hotkeys.deleteLink === 'string' && hotkeys.deleteLink) hotkeyDeleteLink.value = hotkeys.deleteLink;
   if (typeof hotkeys.toggleHard === 'string' && hotkeys.toggleHard) hotkeyToggleHard.value = hotkeys.toggleHard;
   if (typeof hotkeys.toggleSettings === 'string' && hotkeys.toggleSettings) hotkeyToggleSettings.value = hotkeys.toggleSettings;
   if (typeof hotkeys.clearSelection === 'string' && hotkeys.clearSelection) hotkeyClearSelection.value = hotkeys.clearSelection;
@@ -834,6 +914,14 @@ function handleHotkeys(event) {
     event.preventDefault();
     addManualLink();
   }
+  if (formatHotkey(event) === hotkeyAddLinkedRecord.value) {
+    event.preventDefault();
+    addLinkedRecord();
+  }
+  if (formatHotkey(event) === hotkeyDeleteRecord.value) {
+    event.preventDefault();
+    deleteSelectedItem();
+  }
   if (formatHotkey(event) === hotkeyEditRecord.value) {
     event.preventDefault();
     editSelectedRecord();
@@ -842,10 +930,6 @@ function handleHotkeys(event) {
     event.preventDefault();
     showChanges.checked = !showChanges.checked;
     refreshRelationshipDisplay();
-  }
-  if (formatHotkey(event) === hotkeyDeleteLink.value) {
-    event.preventDefault();
-    deleteSelectedManualLink();
   }
   if (formatHotkey(event) === hotkeyToggleHard.value) {
     event.preventDefault();
