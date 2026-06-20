@@ -243,7 +243,8 @@ class CsvViewer {
       }
       if (canDrawRelationships) {
         card.dataset.relationshipKey = normalizeRelationshipValue(displayRow[relationshipField]);
-        card.addEventListener('mouseenter', () => highlightRelationship(card.dataset.relationshipKey));
+        card.dataset.side = this.side;
+        card.addEventListener('mouseenter', () => highlightCardConnections(card, this.side));
         card.addEventListener('mouseleave', clearRelationshipHighlight);
       }
       card.recordValues = row.slice();
@@ -1328,6 +1329,38 @@ function highlightRelationship(key) {
     const matches = element.dataset.relationshipKey === key;
     element.classList.toggle('relationship-active', matches);
     element.classList.toggle('relationship-muted', !matches);
+  });
+}
+
+function highlightCardConnections(card, side) {
+  const oppositeSide = side === 'left' ? 'right' : 'left';
+  const linkedCards = new Set([card]);
+  const manualLinkIds = new Set();
+  manualLinks.forEach(link => {
+    const row = side === 'left' ? link.leftRow : link.rightRow;
+    if (showChanges.checked && getRecordKey(row) === getRecordKey(card.recordValues)) manualLinkIds.add(link.id);
+  });
+
+  document.querySelectorAll(`.row-card[data-side="${oppositeSide}"]`).forEach(candidate => {
+    const hardLinked = showHardLinks.checked
+      && card.dataset.relationshipKey
+      && card.dataset.relationshipKey === candidate.dataset.relationshipKey;
+    const manualLinked = showChanges.checked && manualLinkIds.size && manualLinks.some(link => {
+      const oppositeRow = side === 'left' ? link.rightRow : link.leftRow;
+      return manualLinkIds.has(link.id) && getRecordKey(oppositeRow) === getRecordKey(candidate.recordValues);
+    });
+    if (hardLinked || manualLinked) linkedCards.add(candidate);
+  });
+
+  document.querySelectorAll('.row-card[data-side]').forEach(candidate => {
+    candidate.classList.toggle('relationship-active', linkedCards.has(candidate));
+    candidate.classList.toggle('relationship-muted', !linkedCards.has(candidate));
+  });
+  document.querySelectorAll('.relationship-line').forEach(line => {
+    const hardLinked = showHardLinks.checked && card.dataset.relationshipKey && line.dataset.relationshipKey === card.dataset.relationshipKey;
+    const manualLinked = showChanges.checked && manualLinkIds.has(line.dataset.manualLinkId);
+    line.classList.toggle('relationship-active', hardLinked || manualLinked);
+    line.classList.toggle('relationship-muted', !(hardLinked || manualLinked));
   });
 }
 
