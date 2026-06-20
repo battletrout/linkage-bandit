@@ -72,8 +72,8 @@
       </div>
     </main>
 
-    <aside class="hotkey-menu" aria-label="Hotkey settings">
-      <h2>Hotkeys</h2>
+    <aside id="hotkey-menu" class="hotkey-menu" aria-label="Hotkey settings">
+      <div class="hotkey-menu-heading"><h2>Hotkeys</h2><button id="hide-hotkeys" type="button">Hide</button></div>
       <label>Add linkage<input id="hotkey-add-link" value="L" readonly /></label>
       <label>Edit record<input id="hotkey-edit-record" value="E" readonly /></label>
       <label>Toggle changes<input id="hotkey-toggle-changes" value="C" readonly /></label>
@@ -83,6 +83,7 @@
       <label>Clear selection<input id="hotkey-clear-selection" value="Escape" readonly /></label>
       <p>Click a key field, then press a new shortcut to record it.</p>
     </aside>
+    <button id="show-hotkeys" class="show-hotkeys" type="button" hidden>Show hotkeys</button>
 
     <dialog id="record-editor" class="record-editor">
       <form id="record-editor-form" method="dialog">

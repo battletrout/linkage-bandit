@@ -25,6 +25,9 @@ const hotkeyDeleteLink = document.querySelector('#hotkey-delete-link');
 const hotkeyToggleHard = document.querySelector('#hotkey-toggle-hard');
 const hotkeyToggleManual = document.querySelector('#hotkey-toggle-manual');
 const hotkeyClearSelection = document.querySelector('#hotkey-clear-selection');
+const hotkeyMenu = document.querySelector('#hotkey-menu');
+const hideHotkeysButton = document.querySelector('#hide-hotkeys');
+const showHotkeysButton = document.querySelector('#show-hotkeys');
 const recordEditor = document.querySelector('#record-editor');
 const recordEditorForm = document.querySelector('#record-editor-form');
 const recordEditorFields = document.querySelector('#record-editor-fields');
@@ -274,6 +277,8 @@ changesFileInput.addEventListener('change', loadChangesFile);
 saveChangesButton.addEventListener('click', () => saveChangesFile(getWorkspaceFileName('changes')));
 configFileInput.addEventListener('change', loadConfigurationFile);
 saveConfigButton.addEventListener('click', () => saveConfigurationFile(getWorkspaceFileName('config')));
+hideHotkeysButton.addEventListener('click', () => setHotkeyMenuVisibility(false));
+showHotkeysButton.addEventListener('click', () => setHotkeyMenuVisibility(true));
 setupHotkeyRecorder(hotkeyAddLink);
 setupHotkeyRecorder(hotkeyEditRecord);
 setupHotkeyRecorder(hotkeyToggleChanges);
@@ -526,6 +531,7 @@ function saveConfigurationFile(fileName) {
       toggleHard: hotkeyToggleHard.value,
       toggleManual: hotkeyToggleManual.value,
       clearSelection: hotkeyClearSelection.value,
+      menuVisible: !hotkeyMenu.hidden,
     },
   };
   loadedConfiguration = configuration;
@@ -643,6 +649,12 @@ function applyHotkeyConfiguration() {
   if (typeof hotkeys.toggleHard === 'string' && hotkeys.toggleHard) hotkeyToggleHard.value = hotkeys.toggleHard;
   if (typeof hotkeys.toggleManual === 'string' && hotkeys.toggleManual) hotkeyToggleManual.value = hotkeys.toggleManual;
   if (typeof hotkeys.clearSelection === 'string' && hotkeys.clearSelection) hotkeyClearSelection.value = hotkeys.clearSelection;
+  if (typeof hotkeys.menuVisible === 'boolean') setHotkeyMenuVisibility(hotkeys.menuVisible);
+}
+
+function setHotkeyMenuVisibility(visible) {
+  hotkeyMenu.hidden = !visible;
+  showHotkeysButton.hidden = visible;
 }
 
 function selectOptionByHeader(select, headers, header) {
