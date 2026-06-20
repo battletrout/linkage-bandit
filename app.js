@@ -84,6 +84,7 @@ class CsvViewer {
     this.sortField = element.querySelector('.sort-field');
     this.sortDirection = element.querySelector('.sort-direction');
     this.exportFormat = element.querySelector('.export-format');
+    this.exportContent = element.querySelector('.export-content');
     this.addRecordButton = element.querySelector('.add-record');
     this.downloadFileButton = element.querySelector('.download-file');
     element.querySelector('.viewer-title').textContent = title;
@@ -96,6 +97,7 @@ class CsvViewer {
     this.sortField.addEventListener('change', () => this.updateDisplay());
     this.sortDirection.addEventListener('change', () => this.updateDisplay());
     this.exportFormat.addEventListener('change', () => this.updateExportButton());
+    this.exportContent.addEventListener('change', () => this.updateExportButton());
     this.addRecordButton.addEventListener('click', () => openNewRecordEditor(this));
     this.downloadFileButton.addEventListener('click', () => this.downloadFile());
     element.querySelector('.clear-filter').addEventListener('click', () => {
@@ -115,6 +117,7 @@ class CsvViewer {
     this.fileName = '';
     this.rawCsv = '';
     this.exportFormat.hidden = true;
+    this.exportContent.hidden = true;
     this.addRecordButton.hidden = true;
     this.downloadFileButton.hidden = true;
     updateRelationshipControls();
@@ -143,6 +146,7 @@ class CsvViewer {
       this.fieldControls.hidden = false;
       this.dataControls.hidden = false;
       this.exportFormat.hidden = false;
+      this.exportContent.hidden = false;
       this.addRecordButton.hidden = false;
       this.downloadFileButton.hidden = false;
       this.updateExportButton();
@@ -276,14 +280,20 @@ class CsvViewer {
   }
 
   updateExportButton() {
-    this.downloadFileButton.textContent = `Download ${this.exportFormat.value.toUpperCase()}`;
+    const prefix = this.exportContent.value === 'integrated' ? 'Download integrated' : 'Download source';
+    this.downloadFileButton.textContent = `${prefix} ${this.exportFormat.value.toUpperCase()}`;
   }
 
   downloadFile() {
     const exportingJson = this.exportFormat.value === 'json';
-    const contents = exportingJson
-      ? JSON.stringify({ format: 'csv-json-lossless-v1', sourceFileName: this.fileName, csv: this.rawCsv }, null, 2)
+    const integrating = this.exportContent.value === 'integrated';
+    if (integrating && !confirmIntegratedExport()) return;
+    const csv = integrating
+      ? serializeCsv(this.headers, buildIntegratedRows(this))
       : this.rawCsv;
+    const contents = exportingJson
+      ? JSON.stringify({ format: 'csv-json-lossless-v1', sourceFileName: this.fileName, csv }, null, 2)
+      : csv;
     const exportedFile = new Blob([contents], {
       type: exportingJson ? 'application/json' : 'text/csv;charset=utf-8',
     });
@@ -294,6 +304,13 @@ class CsvViewer {
     download.click();
     setTimeout(() => URL.revokeObjectURL(url), 0);
   }
+}
+
+function confirmIntegratedExport() {
+  const [leftViewer, rightViewer] = csvViewers;
+  const leftField = leftViewer?.headers[Number(leftMatchField.value)] ?? 'not selected';
+  const rightField = rightViewer?.headers[Number(rightMatchField.value)] ?? 'not selected';
+  return window.confirm(`Integrated export will write linkage values using:\n\nCSV A: ${leftField}\nCSV B: ${rightField}\n\nMake sure these are the correct linkage fields before continuing.`);
 }
 
 createViewer('CSV A', 'left');
@@ -787,6 +804,7 @@ function getViewerConfiguration(viewer) {
     sortField: viewer.headers[Number(viewer.sortField.value)] ?? '',
     sortDirection: viewer.sortDirection.value,
     exportFormat: viewer.exportFormat.value,
+    exportContent: viewer.exportContent.value,
   };
 }
 
@@ -969,6 +987,7 @@ function applyViewerConfiguration(viewer) {
   selectOptionByHeader(viewer.sortField, viewer.headers, configuration.sortField);
   viewer.sortDirection.value = configuration.sortDirection === 'desc' ? 'desc' : 'asc';
   viewer.exportFormat.value = configuration.exportFormat === 'csv' ? 'csv' : 'json';
+  viewer.exportContent.value = configuration.exportContent === 'source' ? 'source' : 'integrated';
   viewer.updateExportButton();
 }
 
@@ -1295,6 +1314,68 @@ function getFileNameWithExtension(filePath, extension) {
 function getFileStem(filePath) {
   const fileName = getCrossPlatformFileName(filePath);
   return fileName.replace(/\.[^.]*$/, '') || 'untitled';
+}
+
+function buildIntegratedRows(viewer) {
+  const [leftViewer, rightViewer] = csvViewers;
+  const isLeft = viewer === leftViewer;
+  const ownField = isLeft ? Number(leftMatchField.value) : Number(rightMatchField.value);
+  const oppositeField = isLeft ? Number(rightMatchField.value) : Number(leftMatchField.value);
+  const ownEntries = getIntegratedEntries(viewer);
+  const oppositeEntries = getIntegratedEntries(isLeft ? rightViewer : leftViewer);
+
+  return ownEntries.map(entry => {
+    const row = entry.values.slice();
+    if (!oppositeEntries.length || !Number.isFinite(ownField) || !Number.isFinite(oppositeField)) return row;
+    const linkedEntries = getIntegratedLinkedEntries(entry, viewer.side, oppositeEntries, isLeft ? 'right' : 'left');
+    if (linkedEntries.length) row[ownField] = formatLinkageValue(linkedEntries.map(linked => linked.values[oppositeField] ?? ''));
+    return row;
+  });
+}
+
+function getIntegratedEntries(viewer) {
+  if (!viewer?.headers.length) return [];
+  const sourceRows = [...viewer.dataRows, ...getAddedRecords(viewer.side)];
+  return sourceRows
+    .filter(row => !deletedRecords.some(record => record.side === viewer.side && getRecordKey(record.record) === getRecordKey(row)))
+    .map(row => ({ source: row, values: getIntegratedDisplayRow(viewer.side, row) }));
+}
+
+function getIntegratedDisplayRow(side, row) {
+  const change = getRecordChange(side, row);
+  if (!change) return row.slice();
+  return row.map((value, index) => Object.hasOwn(change.fields, index) ? change.fields[index] : value);
+}
+
+function getIntegratedLinkedEntries(entry, side, oppositeEntries, oppositeSide) {
+  const [leftViewer, rightViewer] = csvViewers;
+  const ownField = side === 'left' ? Number(leftMatchField.value) : Number(rightMatchField.value);
+  const oppositeField = oppositeSide === 'left' ? Number(leftMatchField.value) : Number(rightMatchField.value);
+  const ownValue = normalizeRelationshipValue(entry.values[ownField]);
+  const linked = new Map();
+  oppositeEntries.forEach(candidate => {
+    const oppositeValue = normalizeRelationshipValue(candidate.values[oppositeField]);
+    const hardLinked = ownValue && ownValue === oppositeValue;
+    const leftRow = side === 'left' ? entry.source : candidate.source;
+    const rightRow = side === 'right' ? entry.source : candidate.source;
+    const manualLinked = manualLinks.some(link => getRecordKey(link.leftRow) === getRecordKey(leftRow)
+      && getRecordKey(link.rightRow) === getRecordKey(rightRow));
+    if (hardLinked || manualLinked) linked.set(getRecordKey(candidate.source), candidate);
+  });
+  return [...linked.values()];
+}
+
+function formatLinkageValue(values) {
+  if (values.length === 1) return values[0];
+  return `[${values.map(value => `'${String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`).join(', ')}]`;
+}
+
+function serializeCsv(headers, rows) {
+  const encodeCell = value => {
+    const text = String(value ?? '');
+    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  };
+  return [headers, ...rows].map(row => row.map(encodeCell).join(',')).join('\r\n');
 }
 
 function getImportedCsv(fileName, contents) {

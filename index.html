@@ -115,6 +115,10 @@
               <input class="csv-file" type="file" accept=".csv,.json,text/csv,application/json" />
             </label>
             <button class="add-record secondary-button" type="button" hidden>Add record</button>
+            <select class="export-content" aria-label="Export content" hidden>
+              <option value="integrated">Integrate changes &amp; links</option>
+              <option value="source">Original source</option>
+            </select>
             <select class="export-format" aria-label="Export format" hidden>
               <option value="json">JSON</option>
               <option value="csv">CSV</option>
