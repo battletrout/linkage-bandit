@@ -7,20 +7,33 @@ const relationshipLines = document.querySelector('#relationship-lines');
 const connectionSpace = document.querySelector('#connection-space');
 const connectionSpaceValue = document.querySelector('#connection-space-value');
 const linkageLayout = document.querySelector('#linkage-layout');
+const selectionStatus = document.querySelector('#selection-status');
+const addManualLinkButton = document.querySelector('#add-manual-link');
+const clearSelectionButton = document.querySelector('#clear-selection');
+const changesFileInput = document.querySelector('#changes-file');
+const downloadChangesButton = document.querySelector('#download-changes');
+const configFileInput = document.querySelector('#config-file');
+const downloadConfigButton = document.querySelector('#download-config');
+const hotkeyAddLink = document.querySelector('#hotkey-add-link');
+const hotkeyClearSelection = document.querySelector('#hotkey-clear-selection');
 const csvViewers = [];
 let relationshipLineFrame;
+let manualLinks = [];
+let selectedCards = { left: null, right: null };
+let loadedConfiguration = null;
 
-function createViewer(title) {
+function createViewer(title, side) {
   const viewer = viewerTemplate.content.firstElementChild.cloneNode(true);
   viewers.append(viewer);
-  const csvViewer = new CsvViewer(viewer, title);
+  const csvViewer = new CsvViewer(viewer, title, side);
   csvViewers.push(csvViewer);
   return csvViewer;
 }
 
 class CsvViewer {
-  constructor(element, title) {
+  constructor(element, title, side) {
     this.element = element;
+    this.side = side;
     this.headers = [];
     this.dataRows = [];
     this.fileName = '';
@@ -86,6 +99,7 @@ class CsvViewer {
       this.fileName = getImportedFileName(file.name, importedText);
       this.buildFieldPicker();
       this.buildDataControls();
+      applyViewerConfiguration(this);
       this.renderCards();
       this.fieldControls.hidden = false;
       this.dataControls.hidden = false;
@@ -151,6 +165,8 @@ class CsvViewer {
         card.addEventListener('mouseenter', () => highlightRelationship(card.dataset.relationshipKey));
         card.addEventListener('mouseleave', clearRelationshipHighlight);
       }
+      card.recordValues = row.slice();
+      card.addEventListener('click', () => selectCard(this.side, card));
       selectedFields.forEach(index => {
         const field = document.createElement('div');
         const label = document.createElement('strong');
@@ -223,15 +239,23 @@ class CsvViewer {
   }
 }
 
-createViewer('CSV A');
-createViewer('CSV B');
+createViewer('CSV A', 'left');
+createViewer('CSV B', 'right');
 
 leftMatchField.addEventListener('change', refreshRelationshipDisplay);
 rightMatchField.addEventListener('change', refreshRelationshipDisplay);
 linkageLayout.addEventListener('change', refreshRelationshipDisplay);
+addManualLinkButton.addEventListener('click', addManualLink);
+clearSelectionButton.addEventListener('click', clearSelectedCards);
+changesFileInput.addEventListener('change', loadChangesFile);
+downloadChangesButton.addEventListener('click', downloadChangesFile);
+configFileInput.addEventListener('change', loadConfigurationFile);
+downloadConfigButton.addEventListener('click', downloadConfigurationFile);
+setupHotkeyRecorder(hotkeyAddLink);
+setupHotkeyRecorder(hotkeyClearSelection);
+document.addEventListener('keydown', handleHotkeys);
 connectionSpace.addEventListener('input', () => {
-  viewers.style.setProperty('--connection-gap', `${connectionSpace.value}px`);
-  connectionSpaceValue.textContent = `${connectionSpace.value} px`;
+  setConnectionSpace(Number(connectionSpace.value));
   scheduleRelationshipLineUpdate();
 });
 window.addEventListener('resize', scheduleRelationshipLineUpdate);
@@ -248,6 +272,7 @@ function updateRelationshipControls() {
 
   populateMatchField(leftMatchField, leftViewer.headers);
   populateMatchField(rightMatchField, rightViewer.headers);
+  applyRelationshipConfiguration();
   refreshRelationshipDisplay();
 }
 
@@ -259,8 +284,226 @@ function populateMatchField(select, headers) {
 }
 
 function refreshRelationshipDisplay() {
+  clearSelectedCards();
   csvViewers.forEach(viewer => viewer.renderCards());
   scheduleRelationshipLineUpdate();
+}
+
+function selectCard(side, card) {
+  selectedCards[side] = card;
+  updateSelectedCardUi();
+}
+
+function clearSelectedCards() {
+  selectedCards = { left: null, right: null };
+  updateSelectedCardUi();
+}
+
+function updateSelectedCardUi() {
+  document.querySelectorAll('.row-card.relationship-selected').forEach(card => card.classList.remove('relationship-selected'));
+  Object.values(selectedCards).filter(Boolean).forEach(card => card.classList.add('relationship-selected'));
+  const canAdd = selectedCards.left && selectedCards.right;
+  addManualLinkButton.disabled = !canAdd;
+  selectionStatus.textContent = canAdd
+    ? 'Ready to add a blue linkage between the selected cards.'
+    : 'Select one card on each side to add a linkage.';
+}
+
+function addManualLink() {
+  const { left, right } = selectedCards;
+  if (!left || !right) return;
+  const leftRow = left.recordValues;
+  const rightRow = right.recordValues;
+  const exists = manualLinks.some(link => getRecordKey(link.leftRow) === getRecordKey(leftRow)
+    && getRecordKey(link.rightRow) === getRecordKey(rightRow));
+  if (!exists) {
+    manualLinks.push({
+      id: createChangeId(),
+      leftRow: leftRow.slice(),
+      rightRow: rightRow.slice(),
+    });
+  }
+  clearSelectedCards();
+  scheduleRelationshipLineUpdate();
+}
+
+function createChangeId() {
+  return globalThis.crypto?.randomUUID?.() ?? `link-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function getRecordKey(row) {
+  return JSON.stringify(row ?? []);
+}
+
+async function loadChangesFile() {
+  const [file] = changesFileInput.files;
+  if (!file) return;
+  try {
+    const changes = JSON.parse(await file.text());
+    if (changes?.format !== 'changes-v1' || !Array.isArray(changes.manualLinks)) {
+      throw new Error('This is not a supported changes file.');
+    }
+    manualLinks = changes.manualLinks.filter(link => Array.isArray(link.leftRow) && Array.isArray(link.rightRow));
+    scheduleRelationshipLineUpdate();
+  } catch (error) {
+    alert(`Could not load changes: ${error.message}`);
+  } finally {
+    changesFileInput.value = '';
+  }
+}
+
+function downloadChangesFile() {
+  downloadTextFile('changes.json', JSON.stringify({ format: 'changes-v1', manualLinks }, null, 2));
+}
+
+async function loadConfigurationFile() {
+  const [file] = configFileInput.files;
+  if (!file) return;
+  try {
+    const configuration = JSON.parse(await file.text());
+    if (configuration?.format !== 'relationship-config-v1') {
+      throw new Error('This is not a supported configuration file.');
+    }
+    loadedConfiguration = configuration;
+    applyConfigurationToWorkspace();
+  } catch (error) {
+    alert(`Could not load configuration: ${error.message}`);
+  } finally {
+    configFileInput.value = '';
+  }
+}
+
+function downloadConfigurationFile() {
+  const [leftViewer, rightViewer] = csvViewers;
+  const configuration = {
+    format: 'relationship-config-v1',
+    viewers: {
+      left: getViewerConfiguration(leftViewer),
+      right: getViewerConfiguration(rightViewer),
+    },
+    relationship: {
+      leftMatchField: leftViewer.headers[Number(leftMatchField.value)] ?? '',
+      rightMatchField: rightViewer.headers[Number(rightMatchField.value)] ?? '',
+      connectionSpace: Number(connectionSpace.value),
+      linkageLayout: linkageLayout.value,
+    },
+    hotkeys: {
+      addLink: hotkeyAddLink.value,
+      clearSelection: hotkeyClearSelection.value,
+    },
+  };
+  downloadTextFile('config.json', JSON.stringify(configuration, null, 2));
+}
+
+function getViewerConfiguration(viewer) {
+  return {
+    displayFields: [...viewer.fieldList.querySelectorAll('input:checked')].map(input => viewer.headers[Number(input.value)]),
+    filterField: viewer.headers[Number(viewer.filterField.value)] ?? '',
+    filterValue: viewer.filterValue.value,
+    sortField: viewer.headers[Number(viewer.sortField.value)] ?? '',
+    sortDirection: viewer.sortDirection.value,
+    exportFormat: viewer.exportFormat.value,
+  };
+}
+
+function applyConfigurationToWorkspace() {
+  applyHotkeyConfiguration();
+  csvViewers.forEach(viewer => applyViewerConfiguration(viewer));
+  const bothFilesLoaded = csvViewers[0]?.headers.length && csvViewers[1]?.headers.length;
+  if (bothFilesLoaded) {
+    applyRelationshipConfiguration();
+    refreshRelationshipDisplay();
+  } else {
+    csvViewers.filter(viewer => viewer.headers.length).forEach(viewer => viewer.renderCards());
+  }
+}
+
+function applyViewerConfiguration(viewer) {
+  const configuration = loadedConfiguration?.viewers?.[viewer.side];
+  if (!configuration || !viewer.headers.length) return;
+  if (Array.isArray(configuration.displayFields)) {
+    viewer.fieldList.querySelectorAll('input').forEach(input => {
+      input.checked = configuration.displayFields.includes(viewer.headers[Number(input.value)]);
+    });
+  }
+  selectOptionByHeader(viewer.filterField, viewer.headers, configuration.filterField);
+  viewer.filterValue.value = configuration.filterValue ?? '';
+  selectOptionByHeader(viewer.sortField, viewer.headers, configuration.sortField);
+  viewer.sortDirection.value = configuration.sortDirection === 'desc' ? 'desc' : 'asc';
+  viewer.exportFormat.value = configuration.exportFormat === 'csv' ? 'csv' : 'json';
+  viewer.updateExportButton();
+}
+
+function applyRelationshipConfiguration() {
+  const configuration = loadedConfiguration?.relationship;
+  if (!configuration) return;
+  const [leftViewer, rightViewer] = csvViewers;
+  selectOptionByHeader(leftMatchField, leftViewer.headers, configuration.leftMatchField);
+  selectOptionByHeader(rightMatchField, rightViewer.headers, configuration.rightMatchField);
+  linkageLayout.value = ['none', 'anchor-a', 'anchor-b'].includes(configuration.linkageLayout)
+    ? configuration.linkageLayout : 'none';
+  const space = Number(configuration.connectionSpace);
+  if (Number.isFinite(space)) setConnectionSpace(space);
+}
+
+function applyHotkeyConfiguration() {
+  const hotkeys = loadedConfiguration?.hotkeys;
+  if (!hotkeys) return;
+  if (typeof hotkeys.addLink === 'string' && hotkeys.addLink) hotkeyAddLink.value = hotkeys.addLink;
+  if (typeof hotkeys.clearSelection === 'string' && hotkeys.clearSelection) hotkeyClearSelection.value = hotkeys.clearSelection;
+}
+
+function selectOptionByHeader(select, headers, header) {
+  const index = headers.indexOf(header);
+  if (index >= 0) select.value = String(index);
+}
+
+function downloadTextFile(fileName, contents) {
+  const blob = new Blob([contents], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const download = document.createElement('a');
+  download.href = url;
+  download.download = fileName;
+  download.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function setConnectionSpace(value) {
+  const clampedValue = Math.min(Number(connectionSpace.max), Math.max(Number(connectionSpace.min), value));
+  connectionSpace.value = String(clampedValue);
+  viewers.style.setProperty('--connection-gap', `${clampedValue}px`);
+  connectionSpaceValue.textContent = `${clampedValue} px`;
+}
+
+function setupHotkeyRecorder(input) {
+  input.addEventListener('keydown', event => {
+    event.preventDefault();
+    if (isModifierKey(event.key)) return;
+    input.value = formatHotkey(event);
+    input.blur();
+  });
+}
+
+function handleHotkeys(event) {
+  if (event.target.matches('input, select, textarea, button')) return;
+  if (formatHotkey(event) === hotkeyAddLink.value) {
+    event.preventDefault();
+    addManualLink();
+  }
+  if (formatHotkey(event) === hotkeyClearSelection.value) {
+    event.preventDefault();
+    clearSelectedCards();
+  }
+}
+
+function formatHotkey(event) {
+  const modifiers = [event.ctrlKey && 'Ctrl', event.altKey && 'Alt', event.shiftKey && 'Shift'].filter(Boolean);
+  const key = event.key === ' ' ? 'Space' : event.key.length === 1 ? event.key.toUpperCase() : event.key;
+  return [...modifiers, key].filter(Boolean).join('+');
+}
+
+function isModifierKey(key) {
+  return ['Control', 'Alt', 'Shift', 'Meta'].includes(key);
 }
 
 function scheduleRelationshipLineUpdate() {
@@ -292,8 +535,29 @@ function drawRelationshipLines() {
     const key = leftCard.dataset.relationshipKey;
     if (!key) return;
     const rightCards = rightCardsByKey.get(key) ?? [];
-    rightCards.forEach(rightCard => addRelationshipLine(leftCard, rightCard, key, canvas));
+    rightCards.forEach(rightCard => addRelationshipLine(leftCard, rightCard, key, canvas, 'hard'));
   });
+
+  const leftCardsByRecord = getCardsByRecord(leftViewer.cardList);
+  const rightCardsByRecord = getCardsByRecord(rightViewer.cardList);
+  manualLinks.forEach(link => {
+    const leftCards = leftCardsByRecord.get(getRecordKey(link.leftRow)) ?? [];
+    const rightCards = rightCardsByRecord.get(getRecordKey(link.rightRow)) ?? [];
+    leftCards.forEach(leftCard => rightCards.forEach(rightCard => {
+      addRelationshipLine(leftCard, rightCard, link.id, canvas, 'manual');
+    }));
+  });
+}
+
+function getCardsByRecord(cardList) {
+  const cardsByRecord = new Map();
+  cardList.querySelectorAll('.row-card').forEach(card => {
+    const key = getRecordKey(card.recordValues);
+    const cards = cardsByRecord.get(key) ?? [];
+    cards.push(card);
+    cardsByRecord.set(key, cards);
+  });
+  return cardsByRecord;
 }
 
 function groupRowsByRelationship(rows, fieldIndex, relationshipOrder) {
@@ -343,7 +607,7 @@ function alignLinkageGroups() {
   });
 }
 
-function addRelationshipLine(leftCard, rightCard, key, canvas) {
+function addRelationshipLine(leftCard, rightCard, key, canvas, type) {
   const left = leftCard.getBoundingClientRect();
   const right = rightCard.getBoundingClientRect();
   const startX = left.right - canvas.left;
@@ -352,10 +616,13 @@ function addRelationshipLine(leftCard, rightCard, key, canvas) {
   const endY = right.top + right.height / 2 - canvas.top;
   const bend = Math.max(36, (endX - startX) * .35);
   const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  line.classList.add('relationship-line');
-  line.dataset.relationshipKey = key;
+  line.classList.add('relationship-line', type === 'manual' ? 'manual-link' : 'hard-link');
+  line.dataset.relationshipKey = type === 'manual' ? `manual-${key}` : key;
   line.setAttribute('d', `M ${startX} ${startY} C ${startX + bend} ${startY}, ${endX - bend} ${endY}, ${endX} ${endY}`);
-  line.addEventListener('mouseenter', () => highlightRelationship(key));
+  line.addEventListener('mouseenter', () => {
+    if (type === 'manual') highlightManualLink(leftCard, rightCard, line);
+    else highlightRelationship(line.dataset.relationshipKey);
+  });
   line.addEventListener('mouseleave', clearRelationshipHighlight);
   relationshipLines.append(line);
 }
@@ -367,6 +634,16 @@ function highlightRelationship(key) {
     element.classList.toggle('relationship-active', matches);
     element.classList.toggle('relationship-muted', !matches);
   });
+}
+
+function highlightManualLink(leftCard, rightCard, line) {
+  clearRelationshipHighlight();
+  document.querySelectorAll('.relationship-line').forEach(otherLine => {
+    otherLine.classList.toggle('relationship-active', otherLine === line);
+    otherLine.classList.toggle('relationship-muted', otherLine !== line);
+  });
+  leftCard.classList.add('relationship-active');
+  rightCard.classList.add('relationship-active');
 }
 
 function clearRelationshipHighlight() {

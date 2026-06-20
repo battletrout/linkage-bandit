@@ -43,12 +43,30 @@
             </select>
           </label>
         </div>
+        <div class="relationship-actions">
+          <span id="selection-status">Select one card on each side to add a linkage.</span>
+          <button id="add-manual-link" class="secondary-button" type="button" disabled>Add linkage</button>
+          <button id="clear-selection" class="secondary-button" type="button">Clear selection</button>
+        </div>
+        <div class="workspace-files">
+          <label class="workspace-file-picker">Load changes<input id="changes-file" type="file" accept=".json,application/json" /></label>
+          <button id="download-changes" class="secondary-button" type="button">Download changes</button>
+          <label class="workspace-file-picker">Load config<input id="config-file" type="file" accept=".json,application/json" /></label>
+          <button id="download-config" class="secondary-button" type="button">Download config</button>
+        </div>
       </section>
 
       <div id="viewers" class="viewers">
         <svg id="relationship-lines" class="relationship-lines" aria-hidden="true"></svg>
       </div>
     </main>
+
+    <aside class="hotkey-menu" aria-label="Hotkey settings">
+      <h2>Hotkeys</h2>
+      <label>Add linkage<input id="hotkey-add-link" value="L" readonly /></label>
+      <label>Clear selection<input id="hotkey-clear-selection" value="Escape" readonly /></label>
+      <p>Click a key field, then press a new shortcut to record it.</p>
+    </aside>
 
     <template id="viewer-template">
       <section class="viewer" aria-label="CSV viewer">

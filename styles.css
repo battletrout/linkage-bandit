@@ -27,12 +27,19 @@ h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.4rem); letter-spacing: -.045em; }
 .connection-space-control span { display: flex; align-items: center; gap: 8px; min-height: 38px; }
 .connection-space-control input { width: 130px; accent-color: #2563eb; }
 .connection-space-control output { min-width: 46px; color: #475569; font-size: .78rem; font-weight: 400; }
+.relationship-actions, .workspace-files { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
+.relationship-actions span { flex: 1 1 220px; color: #475569; font-size: .86rem; }
+.workspace-file-picker { display: inline-flex; align-items: center; min-height: 38px; padding: 7px 10px; border: 1px solid #94a3b8; border-radius: 7px; background: #fff; color: #334155; cursor: pointer; font-size: .9rem; font-weight: 700; }
+.workspace-file-picker input { display: none; }
 
 .viewers { --connection-gap: 120px; position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--connection-gap); row-gap: 24px; margin-top: 32px; align-items: start; }
 .viewer { position: relative; min-width: 0; padding: 22px; border: 1px solid #cbd5e1; border-radius: 16px; background: #f8fafc; }
 .relationship-lines { position: absolute; z-index: 2; top: 0; left: 0; overflow: visible; pointer-events: none; }
-.relationship-line { fill: none; stroke: #60a5fa; stroke-width: 2; opacity: .55; pointer-events: stroke; transition: opacity .15s, stroke-width .15s, stroke .15s; }
-.relationship-line:hover, .relationship-line.relationship-active { stroke: #1d4ed8; stroke-width: 3.5; opacity: 1; }
+.relationship-line { fill: none; stroke: #111827; stroke-width: 2; opacity: .55; pointer-events: stroke; transition: opacity .15s, stroke-width .15s, stroke .15s; }
+.relationship-line.manual-link { stroke: #2563eb; }
+.relationship-line:hover, .relationship-line.relationship-active { stroke-width: 3.5; opacity: 1; }
+.relationship-line.hard-link:hover, .relationship-line.hard-link.relationship-active { stroke: #000; }
+.relationship-line.manual-link:hover, .relationship-line.manual-link.relationship-active { stroke: #1d4ed8; }
 .relationship-line.relationship-muted { opacity: .08; }
 .viewer-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .viewer-title { margin: 0; font-size: 1.35rem; }
@@ -69,9 +76,16 @@ h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.4rem); letter-spacing: -.045em; }
 .row-card { position: relative; z-index: 3; padding: 18px 20px; border: 1px solid #cbd5e1; border-radius: 12px; background: white; box-shadow: 0 1px 2px rgb(15 23 42 / 5%); overflow-wrap: anywhere; transition: border-color .15s, box-shadow .15s, opacity .15s; }
 .row-card.relationship-active { border-color: #2563eb; box-shadow: 0 0 0 3px rgb(37 99 235 / 16%); }
 .row-card.relationship-muted { opacity: .3; }
+.row-card.relationship-selected { border-color: #2563eb; box-shadow: 0 0 0 4px rgb(37 99 235 / 24%); }
 .field-value + .field-value { margin-top: 8px; }
 .field-value strong { color: #0f172a; }
 .empty-state { margin: 0; padding: 24px; border: 1px dashed #94a3b8; border-radius: 12px; color: #64748b; text-align: center; }
+
+.hotkey-menu { position: fixed; right: 16px; bottom: 16px; z-index: 10; width: 205px; padding: 13px; border: 1px solid #bfdbfe; border-radius: 12px; background: rgb(255 255 255 / 96%); box-shadow: 0 8px 24px rgb(15 23 42 / 14%); backdrop-filter: blur(8px); }
+.hotkey-menu h2 { margin: 0 0 9px; color: #1e3a8a; font-size: .92rem; }
+.hotkey-menu label { display: grid; grid-template-columns: 1fr 68px; align-items: center; gap: 8px; margin-top: 7px; color: #475569; font-size: .78rem; font-weight: 700; }
+.hotkey-menu input { min-width: 0; padding: 5px 6px; border: 1px solid #93c5fd; border-radius: 5px; background: #eff6ff; color: #1e3a8a; font: inherit; text-align: center; cursor: pointer; }
+.hotkey-menu p { margin: 10px 0 0; color: #64748b; font-size: .7rem; line-height: 1.35; }
 
 @media (max-width: 560px) {
   .app-shell { padding-top: 40px; }
@@ -83,4 +97,5 @@ h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.4rem); letter-spacing: -.045em; }
   .relationship-equals { align-self: center; padding: 0; }
   .file-picker { align-items: flex-start; flex-direction: column; }
   .field-controls__heading { align-items: flex-start; flex-direction: column; }
+  .hotkey-menu { right: 8px; bottom: 8px; }
 }
