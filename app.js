@@ -4,6 +4,8 @@ const relationshipControls = document.querySelector('#relationship-controls');
 const leftMatchField = document.querySelector('#left-match-field');
 const rightMatchField = document.querySelector('#right-match-field');
 const relationshipLines = document.querySelector('#relationship-lines');
+const connectionSpace = document.querySelector('#connection-space');
+const connectionSpaceValue = document.querySelector('#connection-space-value');
 const csvViewers = [];
 let relationshipLineFrame;
 
@@ -165,6 +167,11 @@ createViewer('CSV B');
 
 leftMatchField.addEventListener('change', refreshRelationshipDisplay);
 rightMatchField.addEventListener('change', refreshRelationshipDisplay);
+connectionSpace.addEventListener('input', () => {
+  viewers.style.setProperty('--connection-gap', `${connectionSpace.value}px`);
+  connectionSpaceValue.textContent = `${connectionSpace.value} px`;
+  scheduleRelationshipLineUpdate();
+});
 window.addEventListener('resize', scheduleRelationshipLineUpdate);
 window.addEventListener('scroll', scheduleRelationshipLineUpdate, true);
 
