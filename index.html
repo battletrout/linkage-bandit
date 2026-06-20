@@ -114,6 +114,21 @@
               <span>Choose a CSV or JSON file</span>
               <input class="csv-file" type="file" accept=".csv,.json,text/csv,application/json" />
             </label>
+            <dialog class="delimiter-menu">
+              <form method="dialog">
+              <span>Import delimiter</span>
+              <select class="delimiter-choice" aria-label="CSV delimiter">
+                <option value="auto">Auto-detect</option>
+                <option value=",">Comma (,)</option>
+                <option value=";">Semicolon (;)</option>
+                <option value="tab">Tab</option>
+                <option value="|">Pipe (|)</option>
+                <option value="custom">Custom…</option>
+              </select>
+              <input class="custom-delimiter" type="text" maxlength="1" placeholder="Delimiter" aria-label="Custom delimiter" hidden />
+              <div><button class="secondary-button" type="submit" value="cancel">Cancel</button><button class="confirm-delimiter secondary-button" type="submit" value="load">Load file</button></div>
+              </form>
+            </dialog>
             <button class="add-record secondary-button" type="button" hidden>Add record</button>
             <select class="export-content" aria-label="Export content" hidden>
               <option value="integrated">Integrate changes &amp; links</option>

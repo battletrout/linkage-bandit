@@ -73,6 +73,7 @@ class CsvViewer {
     this.dataRows = [];
     this.fileName = '';
     this.rawCsv = '';
+    this.delimiter = ',';
     this.fileInput = element.querySelector('.csv-file');
     this.status = element.querySelector('.status');
     this.cardList = element.querySelector('.card-list');
@@ -85,11 +86,14 @@ class CsvViewer {
     this.sortDirection = element.querySelector('.sort-direction');
     this.exportFormat = element.querySelector('.export-format');
     this.exportContent = element.querySelector('.export-content');
+    this.delimiterMenu = element.querySelector('.delimiter-menu');
+    this.delimiterChoice = element.querySelector('.delimiter-choice');
+    this.customDelimiter = element.querySelector('.custom-delimiter');
     this.addRecordButton = element.querySelector('.add-record');
     this.downloadFileButton = element.querySelector('.download-file');
     element.querySelector('.viewer-title').textContent = title;
 
-    this.fileInput.addEventListener('change', () => this.loadFile());
+    this.fileInput.addEventListener('change', () => this.showDelimiterMenu());
     element.querySelector('.select-all').addEventListener('click', () => this.setAllFields(true));
     element.querySelector('.clear-all').addEventListener('click', () => this.setAllFields(false));
     this.filterField.addEventListener('change', () => this.updateDisplay());
@@ -98,6 +102,12 @@ class CsvViewer {
     this.sortDirection.addEventListener('change', () => this.updateDisplay());
     this.exportFormat.addEventListener('change', () => this.updateExportButton());
     this.exportContent.addEventListener('change', () => this.updateExportButton());
+    this.delimiterChoice.addEventListener('change', () => this.updateDelimiterChoice());
+    this.delimiterMenu.addEventListener('submit', event => this.confirmDelimiter(event));
+    this.delimiterMenu.addEventListener('close', () => {
+      if (this.delimiterMenu.returnValue === 'load') this.loadFile();
+      else this.fileInput.value = '';
+    });
     this.addRecordButton.addEventListener('click', () => openNewRecordEditor(this));
     this.downloadFileButton.addEventListener('click', () => this.downloadFile());
     element.querySelector('.clear-filter').addEventListener('click', () => {
@@ -116,6 +126,7 @@ class CsvViewer {
     this.dataRows = [];
     this.fileName = '';
     this.rawCsv = '';
+    this.delimiter = ',';
     this.exportFormat.hidden = true;
     this.exportContent.hidden = true;
     this.addRecordButton.hidden = true;
@@ -128,10 +139,17 @@ class CsvViewer {
       return;
     }
 
+    if (this.delimiterChoice.value === 'custom' && !this.customDelimiter.value) {
+      this.status.classList.add('error');
+      this.status.textContent = 'Enter a custom delimiter character before loading this file.';
+      return;
+    }
+
     try {
       const importedText = await file.text();
       this.rawCsv = getImportedCsv(file.name, importedText);
-      const rows = parseCsv(this.rawCsv);
+      this.delimiter = resolveImportDelimiter(this.delimiterChoice.value, this.customDelimiter.value, file.name, importedText, this.rawCsv);
+      const rows = parseCsv(this.rawCsv, this.delimiter);
       if (rows.length < 2 || !rows[0].some(header => header.trim())) {
         throw new Error('The CSV needs a header row and at least one data row.');
       }
@@ -279,6 +297,33 @@ class CsvViewer {
     return groupRowsForAnchor(baseRows, this, anchorViewer);
   }
 
+  updateDelimiterChoice() {
+    this.customDelimiter.hidden = this.delimiterChoice.value !== 'custom';
+  }
+
+  showDelimiterMenu() {
+    const [file] = this.fileInput.files;
+    if (!file) {
+      return;
+    }
+    if (/\.json$/i.test(file.name)) {
+      this.loadFile();
+      return;
+    }
+    this.delimiterChoice.value = 'auto';
+    this.customDelimiter.value = '';
+    this.customDelimiter.hidden = true;
+    this.delimiterMenu.showModal();
+  }
+
+  confirmDelimiter(event) {
+    if (event.submitter?.value !== 'load') return;
+    if (this.delimiterChoice.value === 'custom' && !this.customDelimiter.value) {
+      event.preventDefault();
+      this.customDelimiter.focus();
+    }
+  }
+
   updateExportButton() {
     const prefix = this.exportContent.value === 'integrated' ? 'Download integrated' : 'Download source';
     this.downloadFileButton.textContent = `${prefix} ${this.exportFormat.value.toUpperCase()}`;
@@ -289,10 +334,10 @@ class CsvViewer {
     const integrating = this.exportContent.value === 'integrated';
     if (integrating && !confirmIntegratedExport()) return;
     const csv = integrating
-      ? serializeCsv(this.headers, buildIntegratedRows(this))
+      ? serializeCsv(this.headers, buildIntegratedRows(this), this.delimiter)
       : this.rawCsv;
     const contents = exportingJson
-      ? JSON.stringify({ format: 'csv-json-lossless-v1', sourceFileName: this.fileName, csv }, null, 2)
+      ? JSON.stringify({ format: 'csv-json-lossless-v1', sourceFileName: this.fileName, delimiter: this.delimiter, csv }, null, 2)
       : csv;
     const exportedFile = new Blob([contents], {
       type: exportingJson ? 'application/json' : 'text/csv;charset=utf-8',
@@ -1370,12 +1415,12 @@ function formatLinkageValue(values) {
   return `[${values.map(value => `'${String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`).join(', ')}]`;
 }
 
-function serializeCsv(headers, rows) {
+function serializeCsv(headers, rows, delimiter = ',') {
   const encodeCell = value => {
     const text = String(value ?? '');
     return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
   };
-  return [headers, ...rows].map(row => row.map(encodeCell).join(',')).join('\r\n');
+  return [headers, ...rows].map(row => row.map(encodeCell).join(delimiter)).join('\r\n');
 }
 
 function getImportedCsv(fileName, contents) {
@@ -1390,6 +1435,28 @@ function getImportedCsv(fileName, contents) {
     throw new Error('JSON imports must use the lossless JSON format exported by this app.');
   }
   return json.csv;
+}
+
+function getImportedDelimiter(fileName, contents, csv) {
+  if (/\.json$/i.test(fileName)) {
+    try {
+      const delimiter = JSON.parse(contents)?.delimiter;
+      if ([',', ';', '\t', '|'].includes(delimiter)) return delimiter;
+    } catch {
+      // Fall back to detection for older lossless JSON files.
+    }
+  }
+  return detectDelimiter(csv);
+}
+
+function resolveImportDelimiter(choice, customDelimiter, fileName, contents, csv) {
+  if (choice === 'auto') return getImportedDelimiter(fileName, contents, csv);
+  if (choice === 'tab') return '\t';
+  if (choice === 'custom') {
+    if (!customDelimiter) throw new Error('Enter a custom delimiter character before importing.');
+    return customDelimiter;
+  }
+  return choice;
 }
 
 function getImportedFileName(fileName, contents) {
@@ -1412,7 +1479,25 @@ function compareValues(first, second) {
 }
 
 // Handles commas, quoted cells, escaped quotes, and line breaks inside quoted cells.
-function parseCsv(input) {
+function detectDelimiter(input) {
+  const candidates = [',', ';', '\t', '|'];
+  const counts = new Map(candidates.map(candidate => [candidate, 0]));
+  let quoted = false;
+  for (let index = 0; index < input.length; index += 1) {
+    const char = input[index];
+    if (char === '"') {
+      if (quoted && input[index + 1] === '"') index += 1;
+      else quoted = !quoted;
+    } else if (!quoted && counts.has(char)) {
+      counts.set(char, counts.get(char) + 1);
+    } else if (!quoted && (char === '\n' || char === '\r')) {
+      break;
+    }
+  }
+  return candidates.reduce((best, candidate) => counts.get(candidate) > counts.get(best) ? candidate : best, ',');
+}
+
+function parseCsv(input, delimiter = ',') {
   const rows = [[]];
   let cell = '';
   let quoted = false;
@@ -1421,7 +1506,7 @@ function parseCsv(input) {
     if (char === '"') {
       if (quoted && input[i + 1] === '"') { cell += '"'; i += 1; }
       else quoted = !quoted;
-    } else if (char === ',' && !quoted) {
+    } else if (char === delimiter && !quoted) {
       rows.at(-1).push(cell); cell = '';
     } else if ((char === '\n' || char === '\r') && !quoted) {
       if (char === '\r' && input[i + 1] === '\n') i += 1;
