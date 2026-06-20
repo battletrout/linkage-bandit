@@ -92,6 +92,7 @@ h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.4rem); letter-spacing: -.045em; }
 .row-card.relationship-muted { opacity: .3; }
 .row-card.relationship-selected { border-color: #2563eb; box-shadow: 0 0 0 4px rgb(37 99 235 / 24%); }
 .row-card.ghost-record { border-color: #ef4444; background: #fff1f2; color: #991b1b; }
+.row-card.added-record { border-color: #93c5fd; background: #eff6ff; }
 .ghost-record strong { color: #991b1b; }
 .ghost-note { margin: 0 0 8px; color: #dc2626; font-size: .8rem; font-weight: 800; }
 .relationship-line.ghost-link { stroke: #ef4444; stroke-dasharray: 6 4; opacity: .9; }

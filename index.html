@@ -64,9 +64,8 @@
           <button id="clear-selection" class="secondary-button" type="button">Clear selection</button>
           </div>
           <div class="link-visibility" aria-label="Visible link types">
-          <label><input id="show-changes" type="checkbox" checked /> Apply changes</label>
+          <label><input id="show-changes" type="checkbox" checked /> Show changes</label>
           <label><input id="show-hard-links" type="checkbox" checked /> Show black CSV links</label>
-          <label><input id="show-manual-links" type="checkbox" checked /> Show blue added links</label>
           </div>
         </section>
         <section class="settings-section"><h3>Appearance</h3><p>Use connection space and linkage layout above to control visual density and grouping. Hotkey visibility is saved with this workspace.</p></section>
@@ -79,12 +78,11 @@
 
     <aside id="hotkey-menu" class="hotkey-menu" aria-label="Hotkey settings">
       <div class="hotkey-menu-heading"><h2>Hotkeys</h2><button id="hide-hotkeys" type="button">Hide</button></div>
-      <label>Add linkage<input id="hotkey-add-link" value="L" readonly /></label>
+      <label>Add new linkage<input id="hotkey-add-link" value="L" readonly /></label>
+      <label>Delete new linkage<input id="hotkey-delete-link" value="Delete" readonly /></label>
       <label>Edit record<input id="hotkey-edit-record" value="E" readonly /></label>
-      <label>Toggle changes<input id="hotkey-toggle-changes" value="C" readonly /></label>
-      <label>Delete blue<input id="hotkey-delete-link" value="Delete" readonly /></label>
-      <label>Toggle black<input id="hotkey-toggle-hard" value="H" readonly /></label>
-      <label>Toggle blue<input id="hotkey-toggle-manual" value="M" readonly /></label>
+      <label>Hide/show changes<input id="hotkey-toggle-changes" value="C" readonly /></label>
+      <label>Hide/show existing linkages<input id="hotkey-toggle-hard" value="H" readonly /></label>
       <label>Clear selection<input id="hotkey-clear-selection" value="Escape" readonly /></label>
       <p>Click a key field, then press a new shortcut to record it.</p>
     </aside>
@@ -111,6 +109,7 @@
               <span>Choose a CSV or JSON file</span>
               <input class="csv-file" type="file" accept=".csv,.json,text/csv,application/json" />
             </label>
+            <button class="add-record secondary-button" type="button" hidden>Add record</button>
             <select class="export-format" aria-label="Export format" hidden>
               <option value="json">JSON</option>
               <option value="csv">CSV</option>
