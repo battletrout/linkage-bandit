@@ -1,10 +1,16 @@
 const viewers = document.querySelector('#viewers');
 const viewerTemplate = document.querySelector('#viewer-template');
+const relationshipControls = document.querySelector('#relationship-controls');
+const leftMatchField = document.querySelector('#left-match-field');
+const rightMatchField = document.querySelector('#right-match-field');
+const csvViewers = [];
 
 function createViewer(title) {
   const viewer = viewerTemplate.content.firstElementChild.cloneNode(true);
   viewers.append(viewer);
-  new CsvViewer(viewer, title);
+  const csvViewer = new CsvViewer(viewer, title);
+  csvViewers.push(csvViewer);
+  return csvViewer;
 }
 
 class CsvViewer {
@@ -44,6 +50,10 @@ class CsvViewer {
     this.fieldControls.hidden = true;
     this.dataControls.hidden = true;
     this.status.classList.remove('error');
+    this.headers = [];
+    this.dataRows = [];
+    this.fileName = '';
+    updateRelationshipControls();
 
     if (!file) {
       this.status.textContent = 'No file selected.';
@@ -64,9 +74,11 @@ class CsvViewer {
       this.renderCards();
       this.fieldControls.hidden = false;
       this.dataControls.hidden = false;
+      updateRelationshipControls();
     } catch (error) {
       this.status.classList.add('error');
       this.status.textContent = `Could not read this CSV: ${error.message}`;
+      updateRelationshipControls();
     }
   }
 
@@ -139,6 +151,23 @@ class CsvViewer {
 
 createViewer('CSV A');
 createViewer('CSV B');
+
+function updateRelationshipControls() {
+  const [leftViewer, rightViewer] = csvViewers;
+  const bothFilesLoaded = leftViewer?.headers.length && rightViewer?.headers.length;
+  relationshipControls.hidden = !bothFilesLoaded;
+  if (!bothFilesLoaded) return;
+
+  populateMatchField(leftMatchField, leftViewer.headers);
+  populateMatchField(rightMatchField, rightViewer.headers);
+}
+
+function populateMatchField(select, headers) {
+  const previousValue = select.value;
+  select.replaceChildren();
+  headers.forEach((header, index) => select.add(new Option(header, index)));
+  select.value = headers[previousValue] ? previousValue : '0';
+}
 
 function compareValues(first, second) {
   const a = (first ?? '').trim();

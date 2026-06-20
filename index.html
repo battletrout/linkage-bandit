@@ -14,6 +14,25 @@
         <p class="intro">Load two CSV files side by side. Each file has its own fields, filters, and sorting.</p>
       </header>
 
+      <section id="relationship-controls" class="relationship-controls" hidden aria-labelledby="relationship-heading">
+        <div>
+          <p class="eyebrow">Relationship</p>
+          <h2 id="relationship-heading">Match rows by field</h2>
+          <p class="relationship-hint">Choose the columns whose values identify the same item in each CSV.</p>
+        </div>
+        <div class="relationship-selectors">
+          <label>
+            CSV A field
+            <select id="left-match-field"></select>
+          </label>
+          <span class="relationship-equals" aria-hidden="true">=</span>
+          <label>
+            CSV B field
+            <select id="right-match-field"></select>
+          </label>
+        </div>
+      </section>
+
       <div id="viewers" class="viewers"></div>
     </main>
 
