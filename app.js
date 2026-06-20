@@ -24,6 +24,7 @@ class CsvViewer {
     this.headers = [];
     this.dataRows = [];
     this.fileName = '';
+    this.rawCsv = '';
     this.fileInput = element.querySelector('.csv-file');
     this.status = element.querySelector('.status');
     this.cardList = element.querySelector('.card-list');
@@ -34,6 +35,7 @@ class CsvViewer {
     this.filterValue = element.querySelector('.filter-value');
     this.sortField = element.querySelector('.sort-field');
     this.sortDirection = element.querySelector('.sort-direction');
+    this.downloadJsonButton = element.querySelector('.download-json');
     element.querySelector('.viewer-title').textContent = title;
 
     this.fileInput.addEventListener('change', () => this.loadFile());
@@ -43,6 +45,7 @@ class CsvViewer {
     this.filterValue.addEventListener('input', () => this.updateDisplay());
     this.sortField.addEventListener('change', () => this.updateDisplay());
     this.sortDirection.addEventListener('change', () => this.updateDisplay());
+    this.downloadJsonButton.addEventListener('click', () => this.downloadJson());
     element.querySelector('.clear-filter').addEventListener('click', () => {
       this.filterValue.value = '';
       this.updateDisplay();
@@ -58,6 +61,8 @@ class CsvViewer {
     this.headers = [];
     this.dataRows = [];
     this.fileName = '';
+    this.rawCsv = '';
+    this.downloadJsonButton.hidden = true;
     updateRelationshipControls();
 
     if (!file) {
@@ -66,7 +71,8 @@ class CsvViewer {
     }
 
     try {
-      const rows = parseCsv(await file.text());
+      this.rawCsv = await file.text();
+      const rows = parseCsv(this.rawCsv);
       if (rows.length < 2 || !rows[0].some(header => header.trim())) {
         throw new Error('The CSV needs a header row and at least one data row.');
       }
@@ -79,6 +85,7 @@ class CsvViewer {
       this.renderCards();
       this.fieldControls.hidden = false;
       this.dataControls.hidden = false;
+      this.downloadJsonButton.hidden = false;
       updateRelationshipControls();
       scheduleRelationshipLineUpdate();
     } catch (error) {
@@ -187,6 +194,21 @@ class CsvViewer {
       .map(row => normalizeRelationshipValue(row[anchorRelationshipField]))
       .filter((key, index, keys) => key && keys.indexOf(key) === index);
     return groupRowsByRelationship(baseRows, thisRelationshipField, anchorKeys);
+  }
+
+  downloadJson() {
+    const losslessJson = {
+      format: 'csv-json-lossless-v1',
+      sourceFileName: this.fileName,
+      csv: this.rawCsv,
+    };
+    const jsonFile = new Blob([JSON.stringify(losslessJson, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(jsonFile);
+    const download = document.createElement('a');
+    download.href = url;
+    download.download = this.fileName.replace(/\.csv$/i, '') + '.json';
+    download.click();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 }
 

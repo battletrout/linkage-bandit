@@ -36,6 +36,7 @@ h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.4rem); letter-spacing: -.045em; }
 .relationship-line.relationship-muted { opacity: .08; }
 .viewer-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .viewer-title { margin: 0; font-size: 1.35rem; }
+.viewer-actions { display: flex; flex-wrap: wrap; justify-content: end; gap: 8px; }
 .file-picker { display: inline-flex; align-items: center; gap: 12px; padding: 10px 13px; border-radius: 10px; background: #2563eb; color: white; cursor: pointer; font-size: .9rem; font-weight: 700; }
 .file-picker:hover { background: #1d4ed8; }
 .file-picker input { max-width: 210px; color: white; }
@@ -76,6 +77,7 @@ h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.4rem); letter-spacing: -.045em; }
   .viewers { grid-template-columns: 1fr; }
   .relationship-lines { display: none; }
   .viewer-header { align-items: flex-start; flex-direction: column; }
+  .viewer-actions { justify-content: start; }
   .relationship-controls, .relationship-selectors { align-items: flex-start; flex-direction: column; }
   .relationship-equals { align-self: center; padding: 0; }
   .file-picker { align-items: flex-start; flex-direction: column; }

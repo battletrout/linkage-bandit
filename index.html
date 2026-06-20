@@ -54,10 +54,13 @@
       <section class="viewer" aria-label="CSV viewer">
         <header class="viewer-header">
           <h2 class="viewer-title"></h2>
-          <label class="file-picker">
-            <span>Choose a .csv file</span>
-            <input class="csv-file" type="file" accept=".csv,text/csv" />
-          </label>
+          <div class="viewer-actions">
+            <label class="file-picker">
+              <span>Choose a .csv file</span>
+              <input class="csv-file" type="file" accept=".csv,text/csv" />
+            </label>
+            <button class="download-json secondary-button" type="button" hidden>Download JSON</button>
+          </div>
         </header>
         <p class="status" aria-live="polite">No file selected.</p>
 
