@@ -62,6 +62,13 @@
           <label><input id="show-hard-links" type="checkbox" checked /> Show black CSV links</label>
           </div>
         </section>
+        <section class="settings-section" aria-labelledby="changes-heading">
+          <h3 id="changes-heading">Changes</h3>
+          <div class="change-actions"><button id="undo-change" class="secondary-button" type="button" disabled>Undo</button><button id="redo-change" class="secondary-button" type="button" disabled>Redo</button></div>
+          <p id="backup-reminder" class="backup-reminder">No unsaved changes.</p>
+          <h4>Change log</h4><div id="change-log" class="change-log"></div>
+          <h4>Unresolved changes</h4><div id="unresolved-changes" class="unresolved-changes"></div>
+        </section>
         <section class="settings-section"><h3>Appearance</h3><p>Use connection space and linkage layout above to control visual density and grouping. Hotkey visibility is saved with this workspace.</p></section>
       </aside>
 
@@ -77,8 +84,10 @@
       <label>Delete selected<input id="hotkey-delete-record" value="D" readonly /></label>
       <label>Edit record<input id="hotkey-edit-record" value="E" readonly /></label>
       <label>Hide/show changes<input id="hotkey-toggle-changes" value="C" readonly /></label>
-      <label>Hide/show existing linkages<input id="hotkey-toggle-hard" value="H" readonly /></label>
+      <label>Hide/show pre-existing linkages<input id="hotkey-toggle-hard" value="H" readonly /></label>
       <label>Toggle settings<input id="hotkey-toggle-settings" value="S" readonly /></label>
+      <label>Undo<input id="hotkey-undo" value="Ctrl+Z" readonly /></label>
+      <label>Redo<input id="hotkey-redo" value="Ctrl+Y" readonly /></label>
       <label>Clear selection<input id="hotkey-clear-selection" value="Escape" readonly /></label>
       <p>Click a key field, then press a new shortcut to record it.</p>
     </aside>

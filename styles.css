@@ -40,6 +40,15 @@ h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.4rem); letter-spacing: -.045em; }
 .relationship-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
 .workspace-files { display: grid; gap: 8px; margin-top: 14px; }
 .workspace-file-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.change-actions { display: flex; gap: 8px; }
+.backup-reminder { margin: 12px 0; color: #64748b; font-size: .86rem; }
+.backup-reminder.unsaved { color: #b45309; font-weight: 700; }
+.settings-section h4 { margin: 16px 0 7px; color: #475569; font-size: .82rem; text-transform: uppercase; letter-spacing: .05em; }
+.change-log, .unresolved-changes { display: grid; gap: 7px; }
+.change-entry, .unresolved-entry { padding: 9px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #475569; font-size: .82rem; line-height: 1.35; }
+.unresolved-entry { border-color: #fca5a5; background: #fff1f2; color: #991b1b; }
+.unresolved-entry div { display: flex; gap: 7px; margin-top: 7px; }
+.unresolved-entry button { padding: 4px 7px; border: 1px solid #fca5a5; border-radius: 5px; background: #fff; color: #b91c1c; cursor: pointer; font: inherit; font-size: .78rem; font-weight: 700; }
 .relationship-actions span { flex: 1 1 220px; color: #475569; font-size: .86rem; }
 .link-visibility { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; color: #475569; font-size: .86rem; }
 .link-visibility label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }

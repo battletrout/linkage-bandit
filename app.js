@@ -22,6 +22,8 @@ const hotkeyEditRecord = document.querySelector('#hotkey-edit-record');
 const hotkeyToggleChanges = document.querySelector('#hotkey-toggle-changes');
 const hotkeyToggleHard = document.querySelector('#hotkey-toggle-hard');
 const hotkeyToggleSettings = document.querySelector('#hotkey-toggle-settings');
+const hotkeyUndo = document.querySelector('#hotkey-undo');
+const hotkeyRedo = document.querySelector('#hotkey-redo');
 const hotkeyClearSelection = document.querySelector('#hotkey-clear-selection');
 const hotkeyMenu = document.querySelector('#hotkey-menu');
 const hideHotkeysButton = document.querySelector('#hide-hotkeys');
@@ -35,6 +37,11 @@ const openSettingsButton = document.querySelector('#open-settings');
 const closeSettingsButton = document.querySelector('#close-settings');
 const settingsDrawer = document.querySelector('#settings-drawer');
 const workspaceSummary = document.querySelector('#workspace-summary');
+const undoChangeButton = document.querySelector('#undo-change');
+const redoChangeButton = document.querySelector('#redo-change');
+const backupReminder = document.querySelector('#backup-reminder');
+const changeLog = document.querySelector('#change-log');
+const unresolvedChanges = document.querySelector('#unresolved-changes');
 const csvViewers = [];
 let relationshipLineFrame;
 let manualLinks = [];
@@ -47,6 +54,8 @@ let loadedConfiguration = null;
 let loadedChangesFileName = '';
 let changesDirty = false;
 let configDirty = false;
+let undoStack = [];
+let redoStack = [];
 
 function createViewer(title, side) {
   const viewer = viewerTemplate.content.firstElementChild.cloneNode(true);
@@ -141,12 +150,14 @@ class CsvViewer {
       scheduleRelationshipLineUpdate();
       updateConfigurationStatus();
       updateWorkspaceSummary();
+      updateChangesPanel();
     } catch (error) {
       this.status.classList.add('error');
       this.status.textContent = `Could not read this CSV: ${error.message}`;
       updateRelationshipControls();
       updateConfigurationStatus();
       updateWorkspaceSummary();
+      updateChangesPanel();
     }
   }
 
@@ -298,6 +309,8 @@ saveChangesButton.addEventListener('click', () => saveChangesFile(getWorkspaceFi
 configFileInput.addEventListener('change', loadConfigurationFile);
 saveConfigButton.addEventListener('click', () => saveConfigurationFile(getWorkspaceFileName('config')));
 resetConfigButton.addEventListener('click', () => { if (loadedConfiguration) applyConfigurationToWorkspace(); });
+undoChangeButton.addEventListener('click', undoChange);
+redoChangeButton.addEventListener('click', redoChange);
 openSettingsButton.addEventListener('click', () => { settingsDrawer.hidden = false; });
 closeSettingsButton.addEventListener('click', () => { settingsDrawer.hidden = true; });
 hideHotkeysButton.addEventListener('click', () => setHotkeyMenuVisibility(false));
@@ -309,6 +322,8 @@ setupHotkeyRecorder(hotkeyEditRecord);
 setupHotkeyRecorder(hotkeyToggleChanges);
 setupHotkeyRecorder(hotkeyToggleHard);
 setupHotkeyRecorder(hotkeyToggleSettings);
+setupHotkeyRecorder(hotkeyUndo);
+setupHotkeyRecorder(hotkeyRedo);
 setupHotkeyRecorder(hotkeyClearSelection);
 document.addEventListener('keydown', handleHotkeys);
 recordEditorForm.addEventListener('submit', saveRecordEdit);
@@ -395,6 +410,7 @@ function addManualLink() {
   const exists = manualLinks.some(link => getRecordKey(link.leftRow) === getRecordKey(leftRow)
     && getRecordKey(link.rightRow) === getRecordKey(rightRow));
   if (!exists) {
+    rememberChangeState();
     manualLinks.push({
       id: createChangeId(),
       leftRow: leftRow.slice(),
@@ -409,6 +425,7 @@ function addManualLink() {
 function deleteSelectedManualLink() {
   if (!selectedManualLinkId) return;
   if (!window.confirm('Are you sure you want to delete this new linkage?')) return;
+  rememberChangeState();
   manualLinks = manualLinks.filter(link => link.id !== selectedManualLinkId);
   markChangesDirty();
   clearSelectedCards();
@@ -453,6 +470,7 @@ function deleteSelectedRecord() {
     ? 'Are you sure you want to delete this new record and all associated linkages?'
     : 'Are you sure you want to delete this record?';
   if (!window.confirm(confirmation)) return;
+  rememberChangeState();
   if (isNewRecord) {
     addedRecords = addedRecords.filter(record => !(record.side === side && getRecordKey(record.record) === getRecordKey(row)));
     manualLinks = manualLinks.filter(link => {
@@ -582,6 +600,7 @@ function saveRecordEdit(event) {
   const record = recordEditor.recordValues;
   if (!side || !record) return;
   if (recordEditor.dataset.mode === 'add') {
+    rememberChangeState();
     const addedRecord = record.slice();
     recordEditorFields.querySelectorAll('input').forEach(input => {
       addedRecord[Number(input.dataset.fieldIndex)] = input.value;
@@ -608,6 +627,7 @@ function saveRecordEdit(event) {
     if (input.value !== (record[index] ?? '')) fields[index] = input.value;
   });
   const existingIndex = recordChanges.findIndex(change => change.side === side && getRecordKey(change.record) === getRecordKey(record));
+  rememberChangeState();
   if (Object.keys(fields).length) {
     const change = { side, record: record.slice(), fields };
     if (existingIndex >= 0) recordChanges[existingIndex] = change;
@@ -626,7 +646,7 @@ async function loadChangesFile() {
   try {
     const changes = JSON.parse(await file.text());
     if (!isValidChangesDocument(changes)) {
-      throw new Error('This is not a supported changes file.');
+      throw new Error('Unsupported changes schema. Expected format "changes-v1".');
     }
     manualLinks = changes.manualLinks.filter(link => Array.isArray(link.leftRow) && Array.isArray(link.rightRow));
     recordChanges = Array.isArray(changes.recordChanges)
@@ -641,6 +661,8 @@ async function loadChangesFile() {
       : [];
     loadedChangesFileName = getCrossPlatformFileName(file.name);
     changesDirty = false;
+    undoStack = [];
+    redoStack = [];
     scheduleRelationshipLineUpdate();
     updateConfigurationStatus();
     updateWorkspaceSummary();
@@ -666,7 +688,7 @@ async function loadConfigurationFile() {
   try {
     const configuration = JSON.parse(await file.text());
     if (!isValidConfigurationDocument(configuration)) {
-      throw new Error('This is not a supported configuration file.');
+      throw new Error('Unsupported configuration schema. Expected format "relationship-config-v1".');
     }
     loadedConfiguration = configuration;
     configDirty = false;
@@ -711,6 +733,8 @@ function saveConfigurationFile(fileName) {
       toggleChanges: hotkeyToggleChanges.value,
       toggleHard: hotkeyToggleHard.value,
       toggleSettings: hotkeyToggleSettings.value,
+      undo: hotkeyUndo.value,
+      redo: hotkeyRedo.value,
       clearSelection: hotkeyClearSelection.value,
       menuVisible: !hotkeyMenu.hidden,
     },
@@ -810,6 +834,7 @@ function updateConfigurationStatus() {
 function markChangesDirty() {
   changesDirty = true;
   updateWorkspaceSummary();
+  updateChangesPanel();
 }
 
 function markConfigDirty() {
@@ -825,6 +850,110 @@ function updateWorkspaceSummary() {
   const orphanCount = getOrphanRecords('left').length + getOrphanRecords('right').length;
   if (orphanCount) states.push(`${orphanCount} unresolved record${orphanCount === 1 ? '' : 's'}`);
   workspaceSummary.textContent = states.length ? states.join(' · ') : 'New workspace';
+}
+
+function captureChangeState() {
+  return structuredClone({ manualLinks, recordChanges, addedRecords, deletedRecords });
+}
+
+function rememberChangeState() {
+  undoStack.push(captureChangeState());
+  if (undoStack.length > 50) undoStack.shift();
+  redoStack = [];
+}
+
+function restoreChangeState(state) {
+  ({ manualLinks, recordChanges, addedRecords, deletedRecords } = structuredClone(state));
+  changesDirty = true;
+  refreshRelationshipDisplay();
+  updateWorkspaceSummary();
+  updateChangesPanel();
+}
+
+function undoChange() {
+  if (!undoStack.length) return;
+  redoStack.push(captureChangeState());
+  restoreChangeState(undoStack.pop());
+}
+
+function redoChange() {
+  if (!redoStack.length) return;
+  undoStack.push(captureChangeState());
+  restoreChangeState(redoStack.pop());
+}
+
+function updateChangesPanel() {
+  undoChangeButton.disabled = !undoStack.length;
+  redoChangeButton.disabled = !redoStack.length;
+  backupReminder.classList.toggle('unsaved', changesDirty);
+  backupReminder.textContent = changesDirty
+    ? 'Unsaved changes — use Save changes to download a backup sidecar.'
+    : 'No unsaved changes.';
+  renderChangeLog();
+  renderUnresolvedChanges();
+}
+
+function renderChangeLog() {
+  changeLog.replaceChildren();
+  const entries = [[addedRecords.length, 'new record'], [recordChanges.length, 'field edit'], [manualLinks.length, 'new linkage'], [deletedRecords.length, 'record marked for deletion']];
+  entries.filter(([count]) => count).forEach(([count, label]) => {
+    const entry = document.createElement('div');
+    entry.className = 'change-entry';
+    entry.textContent = `${count} ${label}${count === 1 ? '' : 's'}`;
+    changeLog.append(entry);
+  });
+  if (!changeLog.children.length) changeLog.innerHTML = '<div class="change-entry">No recorded changes.</div>';
+}
+
+function getUnresolvedChanges() {
+  const issues = [];
+  ['left', 'right'].forEach(side => {
+    const viewer = csvViewers.find(candidate => candidate.side === side);
+    const sourceRecords = new Set((viewer?.dataRows ?? []).map(getRecordKey));
+    recordChanges.filter(change => change.side === side && !sourceRecords.has(getRecordKey(change.record))).forEach(change => issues.push({ type: 'edit', side, record: change.record, label: `Field edit references a missing ${side} record.` }));
+  });
+  manualLinks.forEach(link => {
+    const leftExists = csvViewers[0]?.dataRows.some(row => getRecordKey(row) === getRecordKey(link.leftRow)) || getAddedRecords('left').some(row => getRecordKey(row) === getRecordKey(link.leftRow));
+    const rightExists = csvViewers[1]?.dataRows.some(row => getRecordKey(row) === getRecordKey(link.rightRow)) || getAddedRecords('right').some(row => getRecordKey(row) === getRecordKey(link.rightRow));
+    if (!leftExists || !rightExists) issues.push({ type: 'link', id: link.id, record: !leftExists ? link.leftRow : link.rightRow, side: !leftExists ? 'left' : 'right', label: 'Linkage references a missing record.' });
+  });
+  return issues;
+}
+
+function renderUnresolvedChanges() {
+  unresolvedChanges.replaceChildren();
+  const issues = getUnresolvedChanges();
+  issues.forEach(issue => {
+    const entry = document.createElement('div');
+    entry.className = 'unresolved-entry';
+    entry.append(document.createTextNode(issue.label));
+    const actions = document.createElement('div');
+    const inspect = document.createElement('button');
+    inspect.textContent = 'Inspect';
+    inspect.addEventListener('click', () => inspectUnresolvedChange(issue));
+    const dismiss = document.createElement('button');
+    dismiss.textContent = 'Dismiss';
+    dismiss.addEventListener('click', () => dismissUnresolvedChange(issue));
+    actions.append(inspect, dismiss);
+    entry.append(actions);
+    unresolvedChanges.append(entry);
+  });
+  if (!issues.length) unresolvedChanges.innerHTML = '<div class="change-entry">No unresolved changes.</div>';
+}
+
+function inspectUnresolvedChange(issue) {
+  const viewer = csvViewers.find(candidate => candidate.side === issue.side);
+  const card = [...(viewer?.cardList.querySelectorAll('.row-card') ?? [])].find(item => getRecordKey(item.recordValues) === getRecordKey(issue.record));
+  card?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  card?.classList.add('relationship-selected');
+}
+
+function dismissUnresolvedChange(issue) {
+  rememberChangeState();
+  if (issue.type === 'edit') recordChanges = recordChanges.filter(change => !(change.side === issue.side && getRecordKey(change.record) === getRecordKey(issue.record)));
+  if (issue.type === 'link') manualLinks = manualLinks.filter(link => link.id !== issue.id);
+  markChangesDirty();
+  refreshRelationshipDisplay();
 }
 
 function applyViewerConfiguration(viewer) {
@@ -867,6 +996,8 @@ function applyHotkeyConfiguration() {
   if (typeof hotkeys.toggleChanges === 'string' && hotkeys.toggleChanges) hotkeyToggleChanges.value = hotkeys.toggleChanges;
   if (typeof hotkeys.toggleHard === 'string' && hotkeys.toggleHard) hotkeyToggleHard.value = hotkeys.toggleHard;
   if (typeof hotkeys.toggleSettings === 'string' && hotkeys.toggleSettings) hotkeyToggleSettings.value = hotkeys.toggleSettings;
+  if (typeof hotkeys.undo === 'string' && hotkeys.undo) hotkeyUndo.value = hotkeys.undo;
+  if (typeof hotkeys.redo === 'string' && hotkeys.redo) hotkeyRedo.value = hotkeys.redo;
   if (typeof hotkeys.clearSelection === 'string' && hotkeys.clearSelection) hotkeyClearSelection.value = hotkeys.clearSelection;
   if (typeof hotkeys.menuVisible === 'boolean') setHotkeyMenuVisibility(hotkeys.menuVisible);
 }
@@ -910,6 +1041,16 @@ function setupHotkeyRecorder(input) {
 
 function handleHotkeys(event) {
   if (event.target.matches('input, select, textarea, button')) return;
+  if (formatHotkey(event) === hotkeyUndo.value) {
+    event.preventDefault();
+    undoChange();
+    return;
+  }
+  if (formatHotkey(event) === hotkeyRedo.value) {
+    event.preventDefault();
+    redoChange();
+    return;
+  }
   if (formatHotkey(event) === hotkeyAddLink.value) {
     event.preventDefault();
     addManualLink();
