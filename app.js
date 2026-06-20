@@ -16,10 +16,8 @@ const showHardLinks = document.querySelector('#show-hard-links');
 const showManualLinks = document.querySelector('#show-manual-links');
 const changesFileInput = document.querySelector('#changes-file');
 const saveChangesButton = document.querySelector('#save-changes');
-const saveChangesAsButton = document.querySelector('#save-changes-as');
 const configFileInput = document.querySelector('#config-file');
 const saveConfigButton = document.querySelector('#save-config');
-const saveConfigAsButton = document.querySelector('#save-config-as');
 const hotkeyAddLink = document.querySelector('#hotkey-add-link');
 const hotkeyEditRecord = document.querySelector('#hotkey-edit-record');
 const hotkeyToggleChanges = document.querySelector('#hotkey-toggle-changes');
@@ -274,10 +272,8 @@ showHardLinks.addEventListener('change', refreshRelationshipDisplay);
 showManualLinks.addEventListener('change', refreshRelationshipDisplay);
 changesFileInput.addEventListener('change', loadChangesFile);
 saveChangesButton.addEventListener('click', () => saveChangesFile(getWorkspaceFileName('changes')));
-saveChangesAsButton.addEventListener('click', () => saveChangesAs());
 configFileInput.addEventListener('change', loadConfigurationFile);
 saveConfigButton.addEventListener('click', () => saveConfigurationFile(getWorkspaceFileName('config')));
-saveConfigAsButton.addEventListener('click', () => saveConfigurationAs());
 setupHotkeyRecorder(hotkeyAddLink);
 setupHotkeyRecorder(hotkeyEditRecord);
 setupHotkeyRecorder(hotkeyToggleChanges);
@@ -480,11 +476,6 @@ function saveChangesFile(fileName) {
   updateConfigurationStatus();
 }
 
-function saveChangesAs() {
-  const fileName = requestSidecarFileName('Save changes as', loadedChangesFileName || getWorkspaceFileName('changes'), 'changes');
-  if (fileName) saveChangesFile(fileName);
-}
-
 async function loadConfigurationFile() {
   const [file] = configFileInput.files;
   if (!file) return;
@@ -542,22 +533,11 @@ function saveConfigurationFile(fileName) {
   updateConfigurationStatus();
 }
 
-function saveConfigurationAs() {
-  const fileName = requestSidecarFileName('Save config as', getWorkspaceFileName('config'), 'config');
-  if (fileName) saveConfigurationFile(fileName);
-}
-
 function getWorkspaceFileName(extension) {
   const [leftViewer, rightViewer] = csvViewers;
   const leftName = getFileNameWithExtension(leftViewer?.fileName || 'left', '');
   const rightName = getFileNameWithExtension(rightViewer?.fileName || 'right', '');
   return `${leftName}--${rightName}.${extension}`;
-}
-
-function requestSidecarFileName(title, suggestedName, extension) {
-  const name = window.prompt(`${title}:`, suggestedName);
-  if (!name) return '';
-  return name.toLowerCase().endsWith(`.${extension}`) ? name : `${name}.${extension}`;
 }
 
 function updateInMemoryFileConfiguration(changesFileName) {
