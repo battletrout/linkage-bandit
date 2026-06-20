@@ -24,11 +24,8 @@
           <h3>Data</h3>
           <section id="configuration-status" class="configuration-status" aria-live="polite"><strong>Configuration</strong><span id="configuration-message">No configuration loaded.</span></section>
           <div class="workspace-files">
-            <label class="workspace-file-picker">Load changes<input id="changes-file" type="file" accept=".changes" /></label>
-            <button id="save-changes" class="secondary-button" type="button">Save changes</button>
-            <label class="workspace-file-picker">Load config<input id="config-file" type="file" accept=".config" /></label>
-            <button id="save-config" class="secondary-button" type="button">Save config</button>
-            <button id="reset-config" class="secondary-button" type="button">Reset to config</button>
+            <div class="workspace-file-row"><label class="workspace-file-picker">Load changes<input id="changes-file" type="file" accept=".changes" /></label><button id="save-changes" class="secondary-button" type="button">Save changes</button></div>
+            <div class="workspace-file-row"><label class="workspace-file-picker">Load config<input id="config-file" type="file" accept=".config" /></label><button id="save-config" class="secondary-button" type="button">Save config</button><button id="reset-config" class="secondary-button" type="button">Reset to config</button></div>
           </div>
         </section>
         <section id="relationship-controls" class="settings-section" hidden aria-labelledby="relationship-heading">
@@ -59,9 +56,6 @@
           </div>
           <div class="relationship-actions">
           <span id="selection-status">Select one card on each side to add a linkage.</span>
-          <button id="add-manual-link" class="secondary-button" type="button" disabled>Add linkage</button>
-          <button id="delete-manual-link" class="secondary-button" type="button" disabled>Delete blue link</button>
-          <button id="clear-selection" class="secondary-button" type="button">Clear selection</button>
           </div>
           <div class="link-visibility" aria-label="Visible link types">
           <label><input id="show-changes" type="checkbox" checked /> Show changes</label>
@@ -83,6 +77,7 @@
       <label>Edit record<input id="hotkey-edit-record" value="E" readonly /></label>
       <label>Hide/show changes<input id="hotkey-toggle-changes" value="C" readonly /></label>
       <label>Hide/show existing linkages<input id="hotkey-toggle-hard" value="H" readonly /></label>
+      <label>Toggle settings<input id="hotkey-toggle-settings" value="S" readonly /></label>
       <label>Clear selection<input id="hotkey-clear-selection" value="Escape" readonly /></label>
       <p>Click a key field, then press a new shortcut to record it.</p>
     </aside>

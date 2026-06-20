@@ -8,9 +8,6 @@ const connectionSpace = document.querySelector('#connection-space');
 const connectionSpaceValue = document.querySelector('#connection-space-value');
 const linkageLayout = document.querySelector('#linkage-layout');
 const selectionStatus = document.querySelector('#selection-status');
-const addManualLinkButton = document.querySelector('#add-manual-link');
-const deleteManualLinkButton = document.querySelector('#delete-manual-link');
-const clearSelectionButton = document.querySelector('#clear-selection');
 const showChanges = document.querySelector('#show-changes');
 const showHardLinks = document.querySelector('#show-hard-links');
 const changesFileInput = document.querySelector('#changes-file');
@@ -23,6 +20,7 @@ const hotkeyEditRecord = document.querySelector('#hotkey-edit-record');
 const hotkeyToggleChanges = document.querySelector('#hotkey-toggle-changes');
 const hotkeyDeleteLink = document.querySelector('#hotkey-delete-link');
 const hotkeyToggleHard = document.querySelector('#hotkey-toggle-hard');
+const hotkeyToggleSettings = document.querySelector('#hotkey-toggle-settings');
 const hotkeyClearSelection = document.querySelector('#hotkey-clear-selection');
 const hotkeyMenu = document.querySelector('#hotkey-menu');
 const hideHotkeysButton = document.querySelector('#hide-hotkeys');
@@ -284,9 +282,6 @@ createViewer('CSV B', 'right');
 leftMatchField.addEventListener('change', () => { markConfigDirty(); refreshRelationshipDisplay(); });
 rightMatchField.addEventListener('change', () => { markConfigDirty(); refreshRelationshipDisplay(); });
 linkageLayout.addEventListener('change', () => { markConfigDirty(); refreshRelationshipDisplay(); });
-addManualLinkButton.addEventListener('click', addManualLink);
-deleteManualLinkButton.addEventListener('click', deleteSelectedManualLink);
-clearSelectionButton.addEventListener('click', clearSelectedCards);
 showChanges.addEventListener('change', () => { markConfigDirty(); refreshRelationshipDisplay(); });
 showHardLinks.addEventListener('change', () => { markConfigDirty(); refreshRelationshipDisplay(); });
 changesFileInput.addEventListener('change', loadChangesFile);
@@ -303,6 +298,7 @@ setupHotkeyRecorder(hotkeyEditRecord);
 setupHotkeyRecorder(hotkeyToggleChanges);
 setupHotkeyRecorder(hotkeyDeleteLink);
 setupHotkeyRecorder(hotkeyToggleHard);
+setupHotkeyRecorder(hotkeyToggleSettings);
 setupHotkeyRecorder(hotkeyClearSelection);
 document.addEventListener('keydown', handleHotkeys);
 recordEditorForm.addEventListener('submit', saveRecordEdit);
@@ -363,8 +359,6 @@ function updateSelectedCardUi() {
   document.querySelectorAll('.row-card.relationship-selected').forEach(card => card.classList.remove('relationship-selected'));
   Object.values(selectedCards).filter(Boolean).forEach(card => card.classList.add('relationship-selected'));
   const canAdd = selectedCards.left && selectedCards.right;
-  addManualLinkButton.disabled = !canAdd;
-  deleteManualLinkButton.disabled = !selectedManualLinkId;
   const oneCardSelected = selectedCards.left || selectedCards.right;
   selectionStatus.textContent = canAdd
     ? 'Ready to add a blue linkage between the selected cards.'
@@ -638,6 +632,7 @@ function saveConfigurationFile(fileName) {
       toggleChanges: hotkeyToggleChanges.value,
       deleteLink: hotkeyDeleteLink.value,
       toggleHard: hotkeyToggleHard.value,
+      toggleSettings: hotkeyToggleSettings.value,
       clearSelection: hotkeyClearSelection.value,
       menuVisible: !hotkeyMenu.hidden,
     },
@@ -791,6 +786,7 @@ function applyHotkeyConfiguration() {
   if (typeof hotkeys.toggleChanges === 'string' && hotkeys.toggleChanges) hotkeyToggleChanges.value = hotkeys.toggleChanges;
   if (typeof hotkeys.deleteLink === 'string' && hotkeys.deleteLink) hotkeyDeleteLink.value = hotkeys.deleteLink;
   if (typeof hotkeys.toggleHard === 'string' && hotkeys.toggleHard) hotkeyToggleHard.value = hotkeys.toggleHard;
+  if (typeof hotkeys.toggleSettings === 'string' && hotkeys.toggleSettings) hotkeyToggleSettings.value = hotkeys.toggleSettings;
   if (typeof hotkeys.clearSelection === 'string' && hotkeys.clearSelection) hotkeyClearSelection.value = hotkeys.clearSelection;
   if (typeof hotkeys.menuVisible === 'boolean') setHotkeyMenuVisibility(hotkeys.menuVisible);
 }
@@ -855,6 +851,10 @@ function handleHotkeys(event) {
     event.preventDefault();
     showHardLinks.checked = !showHardLinks.checked;
     refreshRelationshipDisplay();
+  }
+  if (formatHotkey(event) === hotkeyToggleSettings.value) {
+    event.preventDefault();
+    settingsDrawer.hidden = !settingsDrawer.hidden;
   }
   if (formatHotkey(event) === hotkeyClearSelection.value) {
     event.preventDefault();

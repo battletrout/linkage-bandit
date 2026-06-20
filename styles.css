@@ -37,7 +37,9 @@ h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.4rem); letter-spacing: -.045em; }
 .connection-space-control span { display: flex; align-items: center; gap: 8px; min-height: 38px; }
 .connection-space-control input { width: 130px; accent-color: #2563eb; }
 .connection-space-control output { min-width: 46px; color: #475569; font-size: .78rem; font-weight: 400; }
-.relationship-actions, .workspace-files { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
+.relationship-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
+.workspace-files { display: grid; gap: 8px; margin-top: 14px; }
+.workspace-file-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .relationship-actions span { flex: 1 1 220px; color: #475569; font-size: .86rem; }
 .link-visibility { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; color: #475569; font-size: .86rem; }
 .link-visibility label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
