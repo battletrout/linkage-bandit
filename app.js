@@ -20,6 +20,7 @@ const configFileInput = document.querySelector('#config-file');
 const downloadConfigButton = document.querySelector('#download-config');
 const hotkeyAddLink = document.querySelector('#hotkey-add-link');
 const hotkeyEditRecord = document.querySelector('#hotkey-edit-record');
+const hotkeyToggleChanges = document.querySelector('#hotkey-toggle-changes');
 const hotkeyDeleteLink = document.querySelector('#hotkey-delete-link');
 const hotkeyToggleHard = document.querySelector('#hotkey-toggle-hard');
 const hotkeyToggleManual = document.querySelector('#hotkey-toggle-manual');
@@ -269,6 +270,7 @@ configFileInput.addEventListener('change', loadConfigurationFile);
 downloadConfigButton.addEventListener('click', downloadConfigurationFile);
 setupHotkeyRecorder(hotkeyAddLink);
 setupHotkeyRecorder(hotkeyEditRecord);
+setupHotkeyRecorder(hotkeyToggleChanges);
 setupHotkeyRecorder(hotkeyDeleteLink);
 setupHotkeyRecorder(hotkeyToggleHard);
 setupHotkeyRecorder(hotkeyToggleManual);
@@ -500,6 +502,7 @@ function downloadConfigurationFile() {
     hotkeys: {
       addLink: hotkeyAddLink.value,
       editRecord: hotkeyEditRecord.value,
+      toggleChanges: hotkeyToggleChanges.value,
       deleteLink: hotkeyDeleteLink.value,
       toggleHard: hotkeyToggleHard.value,
       toggleManual: hotkeyToggleManual.value,
@@ -575,6 +578,7 @@ function applyHotkeyConfiguration() {
   if (!hotkeys) return;
   if (typeof hotkeys.addLink === 'string' && hotkeys.addLink) hotkeyAddLink.value = hotkeys.addLink;
   if (typeof hotkeys.editRecord === 'string' && hotkeys.editRecord) hotkeyEditRecord.value = hotkeys.editRecord;
+  if (typeof hotkeys.toggleChanges === 'string' && hotkeys.toggleChanges) hotkeyToggleChanges.value = hotkeys.toggleChanges;
   if (typeof hotkeys.deleteLink === 'string' && hotkeys.deleteLink) hotkeyDeleteLink.value = hotkeys.deleteLink;
   if (typeof hotkeys.toggleHard === 'string' && hotkeys.toggleHard) hotkeyToggleHard.value = hotkeys.toggleHard;
   if (typeof hotkeys.toggleManual === 'string' && hotkeys.toggleManual) hotkeyToggleManual.value = hotkeys.toggleManual;
@@ -621,6 +625,11 @@ function handleHotkeys(event) {
   if (formatHotkey(event) === hotkeyEditRecord.value) {
     event.preventDefault();
     editSelectedRecord();
+  }
+  if (formatHotkey(event) === hotkeyToggleChanges.value) {
+    event.preventDefault();
+    showChanges.checked = !showChanges.checked;
+    refreshRelationshipDisplay();
   }
   if (formatHotkey(event) === hotkeyDeleteLink.value) {
     event.preventDefault();
