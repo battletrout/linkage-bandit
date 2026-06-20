@@ -37,6 +37,9 @@ const openSettingsButton = document.querySelector('#open-settings');
 const closeSettingsButton = document.querySelector('#close-settings');
 const settingsDrawer = document.querySelector('#settings-drawer');
 const workspaceSummary = document.querySelector('#workspace-summary');
+const openHelpButton = document.querySelector('#open-help');
+const helpDialog = document.querySelector('#help-dialog');
+const closeHelpButton = document.querySelector('#close-help');
 const undoChangeButton = document.querySelector('#undo-change');
 const redoChangeButton = document.querySelector('#redo-change');
 const backupReminder = document.querySelector('#backup-reminder');
@@ -355,11 +358,11 @@ function confirmIntegratedExport() {
   const [leftViewer, rightViewer] = csvViewers;
   const leftField = leftViewer?.headers[Number(leftMatchField.value)] ?? 'not selected';
   const rightField = rightViewer?.headers[Number(rightMatchField.value)] ?? 'not selected';
-  return window.confirm(`Integrated export will write linkage values using:\n\nCSV A: ${leftField}\nCSV B: ${rightField}\n\nMake sure these are the correct linkage fields before continuing.`);
+  return window.confirm(`Integrated export will write linkage values using:\n\nData A: ${leftField}\nData B: ${rightField}\n\nMake sure these are the correct linkage fields before continuing.`);
 }
 
-createViewer('CSV A', 'left');
-createViewer('CSV B', 'right');
+createViewer('Data A', 'left');
+createViewer('Data B', 'right');
 
 leftMatchField.addEventListener('change', () => { markConfigDirty(); refreshRelationshipDisplay(); });
 rightMatchField.addEventListener('change', () => { markConfigDirty(); refreshRelationshipDisplay(); });
@@ -375,6 +378,8 @@ undoChangeButton.addEventListener('click', undoChange);
 redoChangeButton.addEventListener('click', redoChange);
 openSettingsButton.addEventListener('click', () => { settingsDrawer.hidden = false; });
 closeSettingsButton.addEventListener('click', () => { settingsDrawer.hidden = true; });
+openHelpButton.addEventListener('click', () => helpDialog.showModal());
+closeHelpButton.addEventListener('click', () => helpDialog.close());
 hideHotkeysButton.addEventListener('click', () => setHotkeyMenuVisibility(false));
 showHotkeysButton.addEventListener('click', () => setHotkeyMenuVisibility(true));
 setupHotkeyRecorder(hotkeyAddLink);
@@ -578,7 +583,7 @@ function openNewRecordEditor(viewer, linkedRecord = null) {
   recordEditor.dataset.side = viewer.side;
   recordEditor.recordValues = defaultRecord;
   recordEditor.linkedRecord = linkedRecord;
-  recordEditor.querySelector('h2').textContent = `Add record to ${viewer.side === 'left' ? 'CSV A' : 'CSV B'}`;
+  recordEditor.querySelector('h2').textContent = `Add record to ${viewer.side === 'left' ? 'Data A' : 'Data B'}`;
   recordEditor.showModal();
   recordEditorFields.querySelector('input')?.focus();
 }

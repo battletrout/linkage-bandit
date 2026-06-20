@@ -1,4 +1,4 @@
-# Relationship Linkage Web App
+# Linkage Bandit
 
 A browser-only workspace for comparing two CSV datasets, visualizing relationships, and recording non-destructive changes.
 

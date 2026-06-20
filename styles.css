@@ -11,6 +11,8 @@ body { margin: 0; min-width: 320px; }
 .app-shell { width: min(1600px, calc(100% - 32px)); margin: 0 auto; padding: 64px 0; }
 
 .page-header { max-width: 650px; }
+.brand { display: flex; align-items: center; gap: 14px; }
+.app-logo { width: 64px; height: 64px; object-fit: contain; }
 
 .eyebrow { margin: 0 0 8px; color: #2563eb; font-size: .78rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
 h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.4rem); letter-spacing: -.045em; }
@@ -138,6 +140,15 @@ h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.4rem); letter-spacing: -.045em; }
 .record-editor-fields label { display: grid; gap: 5px; color: #475569; font-size: .85rem; font-weight: 700; }
 .record-editor-fields input { width: 100%; padding: 9px; border: 1px solid #94a3b8; border-radius: 7px; color: #1f2937; font: inherit; font-weight: 400; }
 .record-editor-actions { display: flex; justify-content: end; gap: 8px; margin-top: 18px; }
+.help-dialog { width: min(820px, calc(100% - 32px)); max-height: min(850px, calc(100vh - 32px)); border: 1px solid #bfdbfe; border-radius: 16px; box-shadow: 0 20px 60px rgb(15 23 42 / 28%); }
+.help-dialog::backdrop { background: rgb(15 23 42 / 45%); }
+.help-dialog article { padding: 6px; overflow: auto; }
+.help-dialog header { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
+.help-dialog h2 { margin: 0; font-size: 1.35rem; }
+.help-dialog h3 { margin: 20px 0 7px; color: #1e3a8a; font-size: 1rem; }
+.help-dialog p, .help-dialog li { color: #475569; line-height: 1.55; }
+.help-dialog ul { padding-left: 22px; }
+.help-dialog code { padding: 1px 4px; border-radius: 4px; background: #e2e8f0; color: #1e3a8a; }
 
 @media (max-width: 560px) {
   .app-shell { padding-top: 40px; }

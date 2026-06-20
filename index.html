@@ -3,18 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CSV Rectangle Viewer</title>
+    <title>Linkage Bandit</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <main class="app-shell">
       <header class="page-header">
-        <p class="eyebrow">Local CSV comparer</p>
-        <h1>Rows, neatly boxed.</h1>
-        <p class="intro">Load two CSV files side by side. Each file has its own fields, filters, and sorting.</p>
+        <div class="brand"><img src="logo.png" class="app-logo" alt="Linkage Bandit logo" /><div><p class="eyebrow">Local data-linkage workspace</p><h1>Linkage Bandit</h1></div></div>
+        <p class="intro">Compare two datasets, trace their relationships, and capture non-destructive changes.</p>
         <div class="workspace-bar">
           <span id="workspace-summary">New workspace</span>
           <button id="open-settings" class="secondary-button" type="button">Workspace settings</button>
+          <button id="open-help" class="secondary-button" type="button">Help</button>
         </div>
       </header>
 
@@ -33,12 +33,12 @@
           <p class="relationship-hint">Choose the columns whose values identify the same item in each CSV.</p>
           <div class="relationship-selectors">
           <label>
-            CSV A field
+            Data A field
             <select id="left-match-field"></select>
           </label>
           <span class="relationship-equals" aria-hidden="true">=</span>
           <label>
-            CSV B field
+            Data B field
             <select id="right-match-field"></select>
           </label>
           <label class="connection-space-control">
@@ -49,8 +49,8 @@
             Linkage layout
             <select id="linkage-layout">
               <option value="none">Independent sorting</option>
-              <option value="anchor-a">Anchor CSV A / group CSV B</option>
-              <option value="anchor-b">Anchor CSV B / group CSV A</option>
+              <option value="anchor-a">Anchor Data A / group Data B</option>
+              <option value="anchor-b">Anchor Data B / group Data A</option>
             </select>
           </label>
           </div>
@@ -92,6 +92,19 @@
       <p>Click a key field, then press a new shortcut to record it.</p>
     </aside>
     <button id="show-hotkeys" class="show-hotkeys" type="button" hidden>Show hotkeys</button>
+
+    <dialog id="help-dialog" class="help-dialog">
+      <article>
+        <header><div><p class="eyebrow">Linkage Bandit guide</p><h2>How to use this workspace</h2></div><button id="close-help" class="secondary-button" type="button">Close</button></header>
+        <section><h3>1. Load and configure data</h3><p>Choose a CSV or lossless JSON file for Data A and Data B. CSV imports ask for a delimiter; choose Auto-detect unless you know the file uses a different separator. Open Workspace settings to select visible fields, filters, sorting, and the matching field on each side.</p></section>
+        <section><h3>2. Read and create relationships</h3><p>Black lines are pre-existing links inferred from the selected matching fields. Blue lines are new linkages recorded in changes. Click one card on each side and use the Add new linkage hotkey. Select a blue line, then use Delete selected to remove it.</p><p>Linkage layout can group a child side under an anchor side. Connection space gives the lines room to breathe. Hide/show changes controls every blue change layer; hide/show pre-existing linkages controls black inferred links.</p></section>
+        <section><h3>3. Edit records safely</h3><p>Select a single card and use Edit record. Only displayed fields appear in the editor. Edited values are blue. Add record creates a light-blue record on either side; Add linked record creates one on the opposite side and adds a blue link automatically. Delete selected removes a new record after confirmation, or marks a source record for deletion without modifying the source CSV.</p></section>
+        <section><h3>4. Save, export, and recover</h3><p>Save changes downloads a <code>.changes</code> sidecar containing edits, new records, deletions, and new linkages. Save config downloads a <code>.config</code> sidecar containing workspace settings and hotkeys. Use Undo/Redo for recent in-session changes. The app warns before leaving when changes have not been saved.</p><p>Integrated export applies the change layer to CSV or lossless JSON. It also writes the selected linkage field from linked opposite-side records. One linked record becomes a single value; multiple linked records become a Python-style list. Confirm the selected linkage fields in the export warning before continuing.</p></section>
+        <section><h3>Errors and warnings</h3><ul><li><strong>Unsupported schema:</strong> the sidecar is not a supported <code>changes-v1</code> or <code>relationship-config-v1</code> file.</li><li><strong>CSV needs a header row:</strong> the import has no usable column headings or data rows.</li><li><strong>Unclosed quoted value:</strong> a quoted CSV cell is missing its closing quote.</li><li><strong>Custom delimiter required:</strong> choose one character before loading a custom-delimited CSV.</li><li><strong>Configuration expecting…:</strong> a config remembers a filename that has not been selected in this browser session. This is non-blocking.</li><li><strong>Ghost records / unresolved changes:</strong> a sidecar references a row absent from the current dataset. Inspect or dismiss it from the Changes panel.</li></ul></section>
+        <section><h3>Known limitations</h3><ul><li>Browsers cannot silently reopen arbitrary local files, so loading a config cannot automatically load its CSVs or changes sidecar.</li><li>Record identity is based on the complete original row. Exact duplicate rows can therefore be ambiguous for manual links and changes.</li><li>Very large datasets or many-to-many relationship sets can make the connector view crowded or slower.</li><li>Auto-detect supports comma, semicolon, tab, and pipe. Other separators require the custom option.</li><li>This is a local, single-user workspace. It does not merge competing sidecars or provide real-time collaboration.</li></ul></section>
+        <section><h3>Hotkeys</h3><p>Open the floating Hotkeys panel to view or record shortcuts. Undo and Redo defaults are Ctrl+Z and Ctrl+Y. Workspace settings and hotkey choices are saved in config.</p></section>
+      </article>
+    </dialog>
 
     <dialog id="record-editor" class="record-editor">
       <form id="record-editor-form" method="dialog">
