@@ -31,6 +31,29 @@
         <div id="field-list" class="field-list"></div>
       </section>
 
+      <section id="data-controls" class="data-controls" hidden aria-label="Filter and sort rows">
+        <label>
+          Filter field
+          <select id="filter-field"></select>
+        </label>
+        <label class="filter-search">
+          Contains
+          <input id="filter-value" type="search" placeholder="Type to filter…" />
+        </label>
+        <button id="clear-filter" class="secondary-button" type="button">Clear filter</button>
+        <label>
+          Sort by
+          <select id="sort-field"></select>
+        </label>
+        <label>
+          Direction
+          <select id="sort-direction">
+            <option value="asc">A–Z / low–high</option>
+            <option value="desc">Z–A / high–low</option>
+          </select>
+        </label>
+      </section>
+
       <section id="card-list" class="card-list" aria-label="CSV rows"></section>
     </main>
     <script src="app.js"></script>
