@@ -24,11 +24,24 @@ h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.4rem); letter-spacing: -.045em; }
 .status { min-height: 1.5em; color: #64748b; font-size: .95rem; }
 .status.error { color: #b91c1c; }
 
+.field-controls { margin-top: 28px; padding: 18px; border: 1px solid #cbd5e1; border-radius: 12px; background: #fff; }
+.field-controls__heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.field-controls h2 { margin: 0; font-size: 1rem; }
+.field-actions { display: flex; gap: 8px; }
+.field-actions button { padding: 6px 9px; border: 0; background: transparent; color: #2563eb; cursor: pointer; font: inherit; font-size: .9rem; font-weight: 700; }
+.field-actions button:hover { text-decoration: underline; }
+.field-list { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 14px; }
+.field-option { display: inline-flex; align-items: center; gap: 7px; padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 999px; cursor: pointer; font-size: .9rem; }
+.field-option:has(input:checked) { border-color: #93c5fd; background: #eff6ff; }
+.field-option input { accent-color: #2563eb; }
+
 .card-list { display: grid; gap: 12px; margin-top: 28px; }
 .row-card { padding: 18px 20px; border: 1px solid #cbd5e1; border-radius: 12px; background: white; box-shadow: 0 1px 2px rgb(15 23 42 / 5%); overflow-wrap: anywhere; }
-.row-card strong { color: #0f172a; }
+.field-value + .field-value { margin-top: 8px; }
+.field-value strong { color: #0f172a; }
 
 @media (max-width: 560px) {
   .app-shell { padding-top: 40px; }
   .file-picker { align-items: flex-start; flex-direction: column; }
+  .field-controls__heading { align-items: flex-start; flex-direction: column; }
 }

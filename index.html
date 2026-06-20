@@ -11,7 +11,7 @@
       <header>
         <p class="eyebrow">Local CSV viewer</p>
         <h1>Rows, neatly boxed.</h1>
-        <p class="intro">Choose a CSV file to turn each row into a rectangle using its leftmost column.</p>
+        <p class="intro">Choose a CSV file, then decide which fields appear in each row rectangle.</p>
       </header>
 
       <label class="file-picker" for="csv-file">
@@ -19,6 +19,17 @@
         <input id="csv-file" type="file" accept=".csv,text/csv" />
       </label>
       <p id="status" class="status" aria-live="polite">No file selected.</p>
+
+      <section id="field-controls" class="field-controls" hidden aria-labelledby="field-heading">
+        <div class="field-controls__heading">
+          <h2 id="field-heading">Fields to display</h2>
+          <div class="field-actions">
+            <button id="select-all" type="button">Select all</button>
+            <button id="clear-all" type="button">Clear all</button>
+          </div>
+        </div>
+        <div id="field-list" class="field-list"></div>
+      </section>
 
       <section id="card-list" class="card-list" aria-label="CSV rows"></section>
     </main>
