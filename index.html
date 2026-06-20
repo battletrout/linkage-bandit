@@ -46,7 +46,12 @@
         <div class="relationship-actions">
           <span id="selection-status">Select one card on each side to add a linkage.</span>
           <button id="add-manual-link" class="secondary-button" type="button" disabled>Add linkage</button>
+          <button id="delete-manual-link" class="secondary-button" type="button" disabled>Delete blue link</button>
           <button id="clear-selection" class="secondary-button" type="button">Clear selection</button>
+        </div>
+        <div class="link-visibility" aria-label="Visible link types">
+          <label><input id="show-hard-links" type="checkbox" checked /> Show black CSV links</label>
+          <label><input id="show-manual-links" type="checkbox" checked /> Show blue added links</label>
         </div>
         <div class="workspace-files">
           <label class="workspace-file-picker">Load changes<input id="changes-file" type="file" accept=".changes" /></label>
@@ -64,6 +69,9 @@
     <aside class="hotkey-menu" aria-label="Hotkey settings">
       <h2>Hotkeys</h2>
       <label>Add linkage<input id="hotkey-add-link" value="L" readonly /></label>
+      <label>Delete blue<input id="hotkey-delete-link" value="Delete" readonly /></label>
+      <label>Toggle black<input id="hotkey-toggle-hard" value="H" readonly /></label>
+      <label>Toggle blue<input id="hotkey-toggle-manual" value="M" readonly /></label>
       <label>Clear selection<input id="hotkey-clear-selection" value="Escape" readonly /></label>
       <p>Click a key field, then press a new shortcut to record it.</p>
     </aside>

@@ -9,17 +9,24 @@ const connectionSpaceValue = document.querySelector('#connection-space-value');
 const linkageLayout = document.querySelector('#linkage-layout');
 const selectionStatus = document.querySelector('#selection-status');
 const addManualLinkButton = document.querySelector('#add-manual-link');
+const deleteManualLinkButton = document.querySelector('#delete-manual-link');
 const clearSelectionButton = document.querySelector('#clear-selection');
+const showHardLinks = document.querySelector('#show-hard-links');
+const showManualLinks = document.querySelector('#show-manual-links');
 const changesFileInput = document.querySelector('#changes-file');
 const downloadChangesButton = document.querySelector('#download-changes');
 const configFileInput = document.querySelector('#config-file');
 const downloadConfigButton = document.querySelector('#download-config');
 const hotkeyAddLink = document.querySelector('#hotkey-add-link');
+const hotkeyDeleteLink = document.querySelector('#hotkey-delete-link');
+const hotkeyToggleHard = document.querySelector('#hotkey-toggle-hard');
+const hotkeyToggleManual = document.querySelector('#hotkey-toggle-manual');
 const hotkeyClearSelection = document.querySelector('#hotkey-clear-selection');
 const csvViewers = [];
 let relationshipLineFrame;
 let manualLinks = [];
 let selectedCards = { left: null, right: null };
+let selectedManualLinkId = null;
 let loadedConfiguration = null;
 
 function createViewer(title, side) {
@@ -210,12 +217,7 @@ class CsvViewer {
     if (!isLinkedLayout || thisIsAnchor) return baseRows;
 
     const anchorViewer = linkageLayout.value === 'anchor-a' ? leftViewer : rightViewer;
-    const thisRelationshipField = this === leftViewer ? Number(leftMatchField.value) : Number(rightMatchField.value);
-    const anchorRelationshipField = anchorViewer === leftViewer ? Number(leftMatchField.value) : Number(rightMatchField.value);
-    const anchorKeys = anchorViewer.getBaseRows()
-      .map(row => normalizeRelationshipValue(row[anchorRelationshipField]))
-      .filter((key, index, keys) => key && keys.indexOf(key) === index);
-    return groupRowsByRelationship(baseRows, thisRelationshipField, anchorKeys);
+    return groupRowsForAnchor(baseRows, this, anchorViewer);
   }
 
   updateExportButton() {
@@ -246,12 +248,18 @@ leftMatchField.addEventListener('change', refreshRelationshipDisplay);
 rightMatchField.addEventListener('change', refreshRelationshipDisplay);
 linkageLayout.addEventListener('change', refreshRelationshipDisplay);
 addManualLinkButton.addEventListener('click', addManualLink);
+deleteManualLinkButton.addEventListener('click', deleteSelectedManualLink);
 clearSelectionButton.addEventListener('click', clearSelectedCards);
+showHardLinks.addEventListener('change', refreshRelationshipDisplay);
+showManualLinks.addEventListener('change', refreshRelationshipDisplay);
 changesFileInput.addEventListener('change', loadChangesFile);
 downloadChangesButton.addEventListener('click', downloadChangesFile);
 configFileInput.addEventListener('change', loadConfigurationFile);
 downloadConfigButton.addEventListener('click', downloadConfigurationFile);
 setupHotkeyRecorder(hotkeyAddLink);
+setupHotkeyRecorder(hotkeyDeleteLink);
+setupHotkeyRecorder(hotkeyToggleHard);
+setupHotkeyRecorder(hotkeyToggleManual);
 setupHotkeyRecorder(hotkeyClearSelection);
 document.addEventListener('keydown', handleHotkeys);
 connectionSpace.addEventListener('input', () => {
@@ -296,6 +304,8 @@ function selectCard(side, card) {
 
 function clearSelectedCards() {
   selectedCards = { left: null, right: null };
+  selectedManualLinkId = null;
+  document.querySelectorAll('.relationship-link-selected').forEach(line => line.classList.remove('relationship-link-selected'));
   updateSelectedCardUi();
 }
 
@@ -304,9 +314,20 @@ function updateSelectedCardUi() {
   Object.values(selectedCards).filter(Boolean).forEach(card => card.classList.add('relationship-selected'));
   const canAdd = selectedCards.left && selectedCards.right;
   addManualLinkButton.disabled = !canAdd;
+  deleteManualLinkButton.disabled = !selectedManualLinkId;
   selectionStatus.textContent = canAdd
     ? 'Ready to add a blue linkage between the selected cards.'
     : 'Select one card on each side to add a linkage.';
+}
+
+function selectManualLink(linkId) {
+  selectedManualLinkId = linkId;
+  selectedCards = { left: null, right: null };
+  document.querySelectorAll('.relationship-line.manual-link').forEach(line => {
+    line.classList.toggle('relationship-link-selected', line.dataset.manualLinkId === linkId);
+  });
+  updateSelectedCardUi();
+  selectionStatus.textContent = 'Blue link selected. Delete it with the button or configured hotkey.';
 }
 
 function addManualLink() {
@@ -325,6 +346,13 @@ function addManualLink() {
   }
   clearSelectedCards();
   scheduleRelationshipLineUpdate();
+}
+
+function deleteSelectedManualLink() {
+  if (!selectedManualLinkId) return;
+  manualLinks = manualLinks.filter(link => link.id !== selectedManualLinkId);
+  clearSelectedCards();
+  refreshRelationshipDisplay();
 }
 
 function createChangeId() {
@@ -386,9 +414,14 @@ function downloadConfigurationFile() {
       rightMatchField: rightViewer.headers[Number(rightMatchField.value)] ?? '',
       connectionSpace: Number(connectionSpace.value),
       linkageLayout: linkageLayout.value,
+      showHardLinks: showHardLinks.checked,
+      showManualLinks: showManualLinks.checked,
     },
     hotkeys: {
       addLink: hotkeyAddLink.value,
+      deleteLink: hotkeyDeleteLink.value,
+      toggleHard: hotkeyToggleHard.value,
+      toggleManual: hotkeyToggleManual.value,
       clearSelection: hotkeyClearSelection.value,
     },
   };
@@ -451,12 +484,17 @@ function applyRelationshipConfiguration() {
     ? configuration.linkageLayout : 'none';
   const space = Number(configuration.connectionSpace);
   if (Number.isFinite(space)) setConnectionSpace(space);
+  showHardLinks.checked = configuration.showHardLinks !== false;
+  showManualLinks.checked = configuration.showManualLinks !== false;
 }
 
 function applyHotkeyConfiguration() {
   const hotkeys = loadedConfiguration?.hotkeys;
   if (!hotkeys) return;
   if (typeof hotkeys.addLink === 'string' && hotkeys.addLink) hotkeyAddLink.value = hotkeys.addLink;
+  if (typeof hotkeys.deleteLink === 'string' && hotkeys.deleteLink) hotkeyDeleteLink.value = hotkeys.deleteLink;
+  if (typeof hotkeys.toggleHard === 'string' && hotkeys.toggleHard) hotkeyToggleHard.value = hotkeys.toggleHard;
+  if (typeof hotkeys.toggleManual === 'string' && hotkeys.toggleManual) hotkeyToggleManual.value = hotkeys.toggleManual;
   if (typeof hotkeys.clearSelection === 'string' && hotkeys.clearSelection) hotkeyClearSelection.value = hotkeys.clearSelection;
 }
 
@@ -496,6 +534,20 @@ function handleHotkeys(event) {
   if (formatHotkey(event) === hotkeyAddLink.value) {
     event.preventDefault();
     addManualLink();
+  }
+  if (formatHotkey(event) === hotkeyDeleteLink.value) {
+    event.preventDefault();
+    deleteSelectedManualLink();
+  }
+  if (formatHotkey(event) === hotkeyToggleHard.value) {
+    event.preventDefault();
+    showHardLinks.checked = !showHardLinks.checked;
+    refreshRelationshipDisplay();
+  }
+  if (formatHotkey(event) === hotkeyToggleManual.value) {
+    event.preventDefault();
+    showManualLinks.checked = !showManualLinks.checked;
+    refreshRelationshipDisplay();
   }
   if (formatHotkey(event) === hotkeyClearSelection.value) {
     event.preventDefault();
@@ -538,22 +590,26 @@ function drawRelationshipLines() {
     rightCardsByKey.set(key, matches);
   });
 
-  leftViewer.cardList.querySelectorAll('.row-card[data-relationship-key]').forEach(leftCard => {
-    const key = leftCard.dataset.relationshipKey;
-    if (!key) return;
-    const rightCards = rightCardsByKey.get(key) ?? [];
-    rightCards.forEach(rightCard => addRelationshipLine(leftCard, rightCard, key, canvas, 'hard'));
-  });
+  if (showHardLinks.checked) {
+    leftViewer.cardList.querySelectorAll('.row-card[data-relationship-key]').forEach(leftCard => {
+      const key = leftCard.dataset.relationshipKey;
+      if (!key) return;
+      const rightCards = rightCardsByKey.get(key) ?? [];
+      rightCards.forEach(rightCard => addRelationshipLine(leftCard, rightCard, key, canvas, 'hard'));
+    });
+  }
 
   const leftCardsByRecord = getCardsByRecord(leftViewer.cardList);
   const rightCardsByRecord = getCardsByRecord(rightViewer.cardList);
-  manualLinks.forEach(link => {
-    const leftCards = leftCardsByRecord.get(getRecordKey(link.leftRow)) ?? [];
-    const rightCards = rightCardsByRecord.get(getRecordKey(link.rightRow)) ?? [];
-    leftCards.forEach(leftCard => rightCards.forEach(rightCard => {
-      addRelationshipLine(leftCard, rightCard, link.id, canvas, 'manual');
-    }));
-  });
+  if (showManualLinks.checked) {
+    manualLinks.forEach(link => {
+      const leftCards = leftCardsByRecord.get(getRecordKey(link.leftRow)) ?? [];
+      const rightCards = rightCardsByRecord.get(getRecordKey(link.rightRow)) ?? [];
+      leftCards.forEach(leftCard => rightCards.forEach(rightCard => {
+        addRelationshipLine(leftCard, rightCard, link.id, canvas, 'manual');
+      }));
+    });
+  }
 }
 
 function getCardsByRecord(cardList) {
@@ -567,25 +623,32 @@ function getCardsByRecord(cardList) {
   return cardsByRecord;
 }
 
-function groupRowsByRelationship(rows, fieldIndex, relationshipOrder) {
-  const rowsByKey = new Map();
-  const unlinkedRows = [];
-  rows.forEach(row => {
-    const key = normalizeRelationshipValue(row[fieldIndex]);
-    if (!key) {
-      unlinkedRows.push(row);
-      return;
+function groupRowsForAnchor(rows, dependentViewer, anchorViewer) {
+  const remainingRows = [...rows];
+  const orderedRows = [];
+  anchorViewer.getBaseRows().forEach(anchorRow => {
+    const matches = [];
+    for (let index = remainingRows.length - 1; index >= 0; index -= 1) {
+      if (rowsAreLinked(anchorRow, anchorViewer.side, remainingRows[index], dependentViewer.side)) {
+        matches.unshift(remainingRows[index]);
+        remainingRows.splice(index, 1);
+      }
     }
-    const group = rowsByKey.get(key) ?? [];
-    group.push(row);
-    rowsByKey.set(key, group);
+    orderedRows.push(...matches);
   });
-  const orderedRows = relationshipOrder.flatMap(key => rowsByKey.get(key) ?? []);
-  const orderedKeys = new Set(relationshipOrder);
-  rowsByKey.forEach((group, key) => {
-    if (!orderedKeys.has(key)) orderedRows.push(...group);
-  });
-  return [...orderedRows, ...unlinkedRows];
+  return [...orderedRows, ...remainingRows];
+}
+
+function rowsAreLinked(firstRow, firstSide, secondRow, secondSide) {
+  const leftRow = firstSide === 'left' ? firstRow : secondRow;
+  const rightRow = firstSide === 'right' ? firstRow : secondRow;
+  const leftValue = normalizeRelationshipValue(leftRow[Number(leftMatchField.value)]);
+  const rightValue = normalizeRelationshipValue(rightRow[Number(rightMatchField.value)]);
+  const hardLink = showHardLinks.checked && leftValue && leftValue === rightValue;
+  const manualLink = showManualLinks.checked && manualLinks.some(link =>
+    getRecordKey(link.leftRow) === getRecordKey(leftRow)
+    && getRecordKey(link.rightRow) === getRecordKey(rightRow));
+  return hardLink || manualLink;
 }
 
 function alignLinkageGroups() {
@@ -596,18 +659,13 @@ function alignLinkageGroups() {
 
   const anchorViewer = linkageLayout.value === 'anchor-a' ? leftViewer : rightViewer;
   const groupedViewer = anchorViewer === leftViewer ? rightViewer : leftViewer;
-  const firstGroupedCardByKey = new Map();
-  groupedViewer.cardList.querySelectorAll('.row-card[data-relationship-key]').forEach(card => {
-    const key = card.dataset.relationshipKey;
-    if (key && !firstGroupedCardByKey.has(key)) firstGroupedCardByKey.set(key, card);
-  });
-
-  const alignedKeys = new Set();
-  anchorViewer.cardList.querySelectorAll('.row-card[data-relationship-key]').forEach(anchorCard => {
-    const key = anchorCard.dataset.relationshipKey;
-    const groupedCard = firstGroupedCardByKey.get(key);
-    if (!key || !groupedCard || alignedKeys.has(key)) return;
-    alignedKeys.add(key);
+  const groupedCards = [...groupedViewer.cardList.querySelectorAll('.row-card')];
+  const alignedGroupedCards = new Set();
+  anchorViewer.cardList.querySelectorAll('.row-card').forEach(anchorCard => {
+    const groupedCard = groupedCards.find(card => !alignedGroupedCards.has(card)
+      && rowsAreLinked(anchorCard.recordValues, anchorViewer.side, card.recordValues, groupedViewer.side));
+    if (!groupedCard) return;
+    alignedGroupedCards.add(groupedCard);
     const offset = groupedCard.getBoundingClientRect().top - anchorCard.getBoundingClientRect().top;
     if (offset > 1) anchorCard.style.marginTop = `${offset}px`;
     if (offset < -1) groupedCard.style.marginTop = `${Math.abs(offset)}px`;
@@ -625,12 +683,17 @@ function addRelationshipLine(leftCard, rightCard, key, canvas, type) {
   const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   line.classList.add('relationship-line', type === 'manual' ? 'manual-link' : 'hard-link');
   line.dataset.relationshipKey = type === 'manual' ? `manual-${key}` : key;
+  if (type === 'manual') line.dataset.manualLinkId = key;
   line.setAttribute('d', `M ${startX} ${startY} C ${startX + bend} ${startY}, ${endX - bend} ${endY}, ${endX} ${endY}`);
   line.addEventListener('mouseenter', () => {
     if (type === 'manual') highlightManualLink(leftCard, rightCard, line);
     else highlightRelationship(line.dataset.relationshipKey);
   });
   line.addEventListener('mouseleave', clearRelationshipHighlight);
+  if (type === 'manual') line.addEventListener('click', event => {
+    event.stopPropagation();
+    selectManualLink(key);
+  });
   relationshipLines.append(line);
 }
 
