@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CSV Rectangle Viewer</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header>
+        <p class="eyebrow">Local CSV viewer</p>
+        <h1>Rows, neatly boxed.</h1>
+        <p class="intro">Choose a CSV file to turn each row into a rectangle using its leftmost column.</p>
+      </header>
+
+      <label class="file-picker" for="csv-file">
+        <span>Choose a .csv file</span>
+        <input id="csv-file" type="file" accept=".csv,text/csv" />
+      </label>
+      <p id="status" class="status" aria-live="polite">No file selected.</p>
+
+      <section id="card-list" class="card-list" aria-label="CSV rows"></section>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>
