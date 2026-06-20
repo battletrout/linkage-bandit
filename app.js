@@ -15,9 +15,11 @@ const showChanges = document.querySelector('#show-changes');
 const showHardLinks = document.querySelector('#show-hard-links');
 const showManualLinks = document.querySelector('#show-manual-links');
 const changesFileInput = document.querySelector('#changes-file');
-const downloadChangesButton = document.querySelector('#download-changes');
+const saveChangesButton = document.querySelector('#save-changes');
+const saveChangesAsButton = document.querySelector('#save-changes-as');
 const configFileInput = document.querySelector('#config-file');
-const downloadConfigButton = document.querySelector('#download-config');
+const saveConfigButton = document.querySelector('#save-config');
+const saveConfigAsButton = document.querySelector('#save-config-as');
 const hotkeyAddLink = document.querySelector('#hotkey-add-link');
 const hotkeyEditRecord = document.querySelector('#hotkey-edit-record');
 const hotkeyToggleChanges = document.querySelector('#hotkey-toggle-changes');
@@ -28,6 +30,8 @@ const hotkeyClearSelection = document.querySelector('#hotkey-clear-selection');
 const recordEditor = document.querySelector('#record-editor');
 const recordEditorForm = document.querySelector('#record-editor-form');
 const recordEditorFields = document.querySelector('#record-editor-fields');
+const configurationStatus = document.querySelector('#configuration-status');
+const configurationMessage = document.querySelector('#configuration-message');
 const csvViewers = [];
 let relationshipLineFrame;
 let manualLinks = [];
@@ -35,6 +39,7 @@ let recordChanges = [];
 let selectedCards = { left: null, right: null };
 let selectedManualLinkId = null;
 let loadedConfiguration = null;
+let loadedChangesFileName = '';
 
 function createViewer(title, side) {
   const viewer = viewerTemplate.content.firstElementChild.cloneNode(true);
@@ -97,6 +102,7 @@ class CsvViewer {
 
     if (!file) {
       this.status.textContent = 'No file selected.';
+      updateConfigurationStatus();
       return;
     }
 
@@ -122,10 +128,12 @@ class CsvViewer {
       this.updateExportButton();
       updateRelationshipControls();
       scheduleRelationshipLineUpdate();
+      updateConfigurationStatus();
     } catch (error) {
       this.status.classList.add('error');
       this.status.textContent = `Could not read this CSV: ${error.message}`;
       updateRelationshipControls();
+      updateConfigurationStatus();
     }
   }
 
@@ -265,9 +273,11 @@ showChanges.addEventListener('change', refreshRelationshipDisplay);
 showHardLinks.addEventListener('change', refreshRelationshipDisplay);
 showManualLinks.addEventListener('change', refreshRelationshipDisplay);
 changesFileInput.addEventListener('change', loadChangesFile);
-downloadChangesButton.addEventListener('click', downloadChangesFile);
+saveChangesButton.addEventListener('click', () => saveChangesFile(getWorkspaceFileName('changes')));
+saveChangesAsButton.addEventListener('click', () => saveChangesAs());
 configFileInput.addEventListener('change', loadConfigurationFile);
-downloadConfigButton.addEventListener('click', downloadConfigurationFile);
+saveConfigButton.addEventListener('click', () => saveConfigurationFile(getWorkspaceFileName('config')));
+saveConfigAsButton.addEventListener('click', () => saveConfigurationAs());
 setupHotkeyRecorder(hotkeyAddLink);
 setupHotkeyRecorder(hotkeyEditRecord);
 setupHotkeyRecorder(hotkeyToggleChanges);
@@ -453,7 +463,9 @@ async function loadChangesFile() {
       ? changes.recordChanges.filter(change => ['left', 'right'].includes(change.side)
         && Array.isArray(change.record) && change.fields && typeof change.fields === 'object')
       : [];
+    loadedChangesFileName = getCrossPlatformFileName(file.name);
     scheduleRelationshipLineUpdate();
+    updateConfigurationStatus();
   } catch (error) {
     alert(`Could not load changes: ${error.message}`);
   } finally {
@@ -461,8 +473,16 @@ async function loadChangesFile() {
   }
 }
 
-function downloadChangesFile() {
-  downloadTextFile(getWorkspaceFileName('changes'), JSON.stringify({ format: 'changes-v1', manualLinks, recordChanges }, null, 2));
+function saveChangesFile(fileName) {
+  loadedChangesFileName = fileName;
+  updateInMemoryFileConfiguration(fileName);
+  downloadTextFile(fileName, JSON.stringify({ format: 'changes-v1', manualLinks, recordChanges }, null, 2));
+  updateConfigurationStatus();
+}
+
+function saveChangesAs() {
+  const fileName = requestSidecarFileName('Save changes as', loadedChangesFileName || getWorkspaceFileName('changes'), 'changes');
+  if (fileName) saveChangesFile(fileName);
 }
 
 async function loadConfigurationFile() {
@@ -475,6 +495,7 @@ async function loadConfigurationFile() {
     }
     loadedConfiguration = configuration;
     applyConfigurationToWorkspace();
+    updateConfigurationStatus();
   } catch (error) {
     alert(`Could not load configuration: ${error.message}`);
   } finally {
@@ -482,8 +503,10 @@ async function loadConfigurationFile() {
   }
 }
 
-function downloadConfigurationFile() {
+function saveConfigurationFile(fileName) {
   const [leftViewer, rightViewer] = csvViewers;
+  const associatedChangesFile = loadedChangesFileName || getWorkspaceFileName('changes');
+  loadedChangesFileName = associatedChangesFile;
   const configuration = {
     format: 'relationship-config-v1',
     viewers: {
@@ -499,6 +522,11 @@ function downloadConfigurationFile() {
       showHardLinks: showHardLinks.checked,
       showManualLinks: showManualLinks.checked,
     },
+    files: {
+      leftFile: leftViewer.fileName || '',
+      rightFile: rightViewer.fileName || '',
+      changesFile: associatedChangesFile,
+    },
     hotkeys: {
       addLink: hotkeyAddLink.value,
       editRecord: hotkeyEditRecord.value,
@@ -509,7 +537,14 @@ function downloadConfigurationFile() {
       clearSelection: hotkeyClearSelection.value,
     },
   };
-  downloadTextFile(getWorkspaceFileName('config'), JSON.stringify(configuration, null, 2));
+  loadedConfiguration = configuration;
+  downloadTextFile(fileName, JSON.stringify(configuration, null, 2));
+  updateConfigurationStatus();
+}
+
+function saveConfigurationAs() {
+  const fileName = requestSidecarFileName('Save config as', getWorkspaceFileName('config'), 'config');
+  if (fileName) saveConfigurationFile(fileName);
 }
 
 function getWorkspaceFileName(extension) {
@@ -517,6 +552,22 @@ function getWorkspaceFileName(extension) {
   const leftName = getFileNameWithExtension(leftViewer?.fileName || 'left', '');
   const rightName = getFileNameWithExtension(rightViewer?.fileName || 'right', '');
   return `${leftName}--${rightName}.${extension}`;
+}
+
+function requestSidecarFileName(title, suggestedName, extension) {
+  const name = window.prompt(`${title}:`, suggestedName);
+  if (!name) return '';
+  return name.toLowerCase().endsWith(`.${extension}`) ? name : `${name}.${extension}`;
+}
+
+function updateInMemoryFileConfiguration(changesFileName) {
+  const [leftViewer, rightViewer] = csvViewers;
+  if (!loadedConfiguration) loadedConfiguration = { format: 'relationship-config-v1' };
+  loadedConfiguration.files = {
+    leftFile: leftViewer.fileName || '',
+    rightFile: rightViewer.fileName || '',
+    changesFile: changesFileName,
+  };
 }
 
 function getViewerConfiguration(viewer) {
@@ -540,6 +591,35 @@ function applyConfigurationToWorkspace() {
   } else {
     csvViewers.filter(viewer => viewer.headers.length).forEach(viewer => viewer.renderCards());
   }
+}
+
+function updateConfigurationStatus() {
+  const configuredFiles = loadedConfiguration?.files;
+  if (!loadedConfiguration) {
+    configurationStatus.classList.remove('error');
+    configurationMessage.textContent = 'No configuration loaded.';
+    return;
+  }
+  if (!configuredFiles) {
+    configurationStatus.classList.remove('error');
+    configurationMessage.textContent = 'Configuration loaded; no default files were recorded.';
+    return;
+  }
+  const [leftViewer, rightViewer] = csvViewers;
+  const missing = [];
+  if (configuredFiles.leftFile && leftViewer?.fileName !== configuredFiles.leftFile) {
+    missing.push(`Configuration expecting left file “${configuredFiles.leftFile}”.`);
+  }
+  if (configuredFiles.rightFile && rightViewer?.fileName !== configuredFiles.rightFile) {
+    missing.push(`Configuration expecting right file “${configuredFiles.rightFile}”.`);
+  }
+  if (configuredFiles.changesFile && loadedChangesFileName !== configuredFiles.changesFile) {
+    missing.push(`Configuration expecting changes file “${configuredFiles.changesFile}”.`);
+  }
+  configurationStatus.classList.toggle('error', missing.length > 0);
+  configurationMessage.textContent = missing.length
+    ? missing.join(' ')
+    : 'Configured files loaded successfully.';
 }
 
 function applyViewerConfiguration(viewer) {
