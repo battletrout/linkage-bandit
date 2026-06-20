@@ -3,7 +3,9 @@ const viewerTemplate = document.querySelector('#viewer-template');
 const relationshipControls = document.querySelector('#relationship-controls');
 const leftMatchField = document.querySelector('#left-match-field');
 const rightMatchField = document.querySelector('#right-match-field');
+const relationshipLines = document.querySelector('#relationship-lines');
 const csvViewers = [];
+let relationshipLineFrame;
 
 function createViewer(title) {
   const viewer = viewerTemplate.content.firstElementChild.cloneNode(true);
@@ -75,6 +77,7 @@ class CsvViewer {
       this.fieldControls.hidden = false;
       this.dataControls.hidden = false;
       updateRelationshipControls();
+      scheduleRelationshipLineUpdate();
     } catch (error) {
       this.status.classList.add('error');
       this.status.textContent = `Could not read this CSV: ${error.message}`;
@@ -123,10 +126,17 @@ class CsvViewer {
       .sort((a, b) => compareValues(a.row[sortIndex], b.row[sortIndex]) * direction || a.index - b.index)
       .map(item => item.row);
 
+    const relationshipField = this === csvViewers[0] ? Number(leftMatchField.value) : Number(rightMatchField.value);
+    const canDrawRelationships = csvViewers[0]?.headers.length && csvViewers[1]?.headers.length;
     this.cardList.replaceChildren();
     visibleRows.forEach(row => {
       const card = document.createElement('article');
       card.className = 'row-card';
+      if (canDrawRelationships) {
+        card.dataset.relationshipKey = normalizeRelationshipValue(row[relationshipField]);
+        card.addEventListener('mouseenter', () => highlightRelationship(card.dataset.relationshipKey));
+        card.addEventListener('mouseleave', clearRelationshipHighlight);
+      }
       selectedFields.forEach(index => {
         const field = document.createElement('div');
         const label = document.createElement('strong');
@@ -146,20 +156,30 @@ class CsvViewer {
       this.cardList.append(empty);
     }
     this.status.textContent = `${visibleRows.length} of ${this.dataRows.length} row${this.dataRows.length === 1 ? '' : 's'} shown from ${this.fileName}.`;
+    scheduleRelationshipLineUpdate();
   }
 }
 
 createViewer('CSV A');
 createViewer('CSV B');
 
+leftMatchField.addEventListener('change', refreshRelationshipDisplay);
+rightMatchField.addEventListener('change', refreshRelationshipDisplay);
+window.addEventListener('resize', scheduleRelationshipLineUpdate);
+window.addEventListener('scroll', scheduleRelationshipLineUpdate, true);
+
 function updateRelationshipControls() {
   const [leftViewer, rightViewer] = csvViewers;
   const bothFilesLoaded = leftViewer?.headers.length && rightViewer?.headers.length;
   relationshipControls.hidden = !bothFilesLoaded;
-  if (!bothFilesLoaded) return;
+  if (!bothFilesLoaded) {
+    relationshipLines.replaceChildren();
+    return;
+  }
 
   populateMatchField(leftMatchField, leftViewer.headers);
   populateMatchField(rightMatchField, rightViewer.headers);
+  refreshRelationshipDisplay();
 }
 
 function populateMatchField(select, headers) {
@@ -167,6 +187,79 @@ function populateMatchField(select, headers) {
   select.replaceChildren();
   headers.forEach((header, index) => select.add(new Option(header, index)));
   select.value = headers[previousValue] ? previousValue : '0';
+}
+
+function refreshRelationshipDisplay() {
+  csvViewers.forEach(viewer => viewer.renderCards());
+  scheduleRelationshipLineUpdate();
+}
+
+function scheduleRelationshipLineUpdate() {
+  cancelAnimationFrame(relationshipLineFrame);
+  relationshipLineFrame = requestAnimationFrame(drawRelationshipLines);
+}
+
+function drawRelationshipLines() {
+  const [leftViewer, rightViewer] = csvViewers;
+  relationshipLines.replaceChildren();
+  if (!leftViewer?.headers.length || !rightViewer?.headers.length) return;
+
+  const canvas = viewers.getBoundingClientRect();
+  relationshipLines.setAttribute('width', canvas.width);
+  relationshipLines.setAttribute('height', canvas.height);
+  relationshipLines.setAttribute('viewBox', `0 0 ${canvas.width} ${canvas.height}`);
+
+  const rightCardsByKey = new Map();
+  rightViewer.cardList.querySelectorAll('.row-card[data-relationship-key]').forEach(card => {
+    const key = card.dataset.relationshipKey;
+    if (!key) return;
+    const matches = rightCardsByKey.get(key) ?? [];
+    matches.push(card);
+    rightCardsByKey.set(key, matches);
+  });
+
+  leftViewer.cardList.querySelectorAll('.row-card[data-relationship-key]').forEach(leftCard => {
+    const key = leftCard.dataset.relationshipKey;
+    if (!key) return;
+    const rightCards = rightCardsByKey.get(key) ?? [];
+    rightCards.forEach(rightCard => addRelationshipLine(leftCard, rightCard, key, canvas));
+  });
+}
+
+function addRelationshipLine(leftCard, rightCard, key, canvas) {
+  const left = leftCard.getBoundingClientRect();
+  const right = rightCard.getBoundingClientRect();
+  const startX = left.right - canvas.left;
+  const startY = left.top + left.height / 2 - canvas.top;
+  const endX = right.left - canvas.left;
+  const endY = right.top + right.height / 2 - canvas.top;
+  const bend = Math.max(36, (endX - startX) * .35);
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  line.classList.add('relationship-line');
+  line.dataset.relationshipKey = key;
+  line.setAttribute('d', `M ${startX} ${startY} C ${startX + bend} ${startY}, ${endX - bend} ${endY}, ${endX} ${endY}`);
+  line.addEventListener('mouseenter', () => highlightRelationship(key));
+  line.addEventListener('mouseleave', clearRelationshipHighlight);
+  relationshipLines.append(line);
+}
+
+function highlightRelationship(key) {
+  if (!key || !relationshipLines.querySelector(`[data-relationship-key="${CSS.escape(key)}"]`)) return;
+  document.querySelectorAll('.row-card[data-relationship-key], .relationship-line').forEach(element => {
+    const matches = element.dataset.relationshipKey === key;
+    element.classList.toggle('relationship-active', matches);
+    element.classList.toggle('relationship-muted', !matches);
+  });
+}
+
+function clearRelationshipHighlight() {
+  document.querySelectorAll('.relationship-active, .relationship-muted').forEach(element => {
+    element.classList.remove('relationship-active', 'relationship-muted');
+  });
+}
+
+function normalizeRelationshipValue(value) {
+  return (value ?? '').trim().toLocaleLowerCase();
 }
 
 function compareValues(first, second) {

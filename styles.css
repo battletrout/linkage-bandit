@@ -25,8 +25,12 @@ h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.4rem); letter-spacing: -.045em; }
 .relationship-selectors select { min-width: 145px; min-height: 38px; padding: 7px 9px; border: 1px solid #93c5fd; border-radius: 7px; background: #fff; color: #1f2937; font: inherit; font-weight: 400; }
 .relationship-equals { padding-bottom: 7px; color: #2563eb; font-size: 1.35rem; font-weight: 700; }
 
-.viewers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-top: 32px; align-items: start; }
-.viewer { min-width: 0; padding: 22px; border: 1px solid #cbd5e1; border-radius: 16px; background: #f8fafc; }
+.viewers { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-top: 32px; align-items: start; }
+.viewer { position: relative; min-width: 0; padding: 22px; border: 1px solid #cbd5e1; border-radius: 16px; background: #f8fafc; }
+.relationship-lines { position: absolute; z-index: 2; top: 0; left: 0; overflow: visible; pointer-events: none; }
+.relationship-line { fill: none; stroke: #60a5fa; stroke-width: 2; opacity: .55; pointer-events: stroke; transition: opacity .15s, stroke-width .15s, stroke .15s; }
+.relationship-line:hover, .relationship-line.relationship-active { stroke: #1d4ed8; stroke-width: 3.5; opacity: 1; }
+.relationship-line.relationship-muted { opacity: .08; }
 .viewer-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .viewer-title { margin: 0; font-size: 1.35rem; }
 .file-picker { display: inline-flex; align-items: center; gap: 12px; padding: 10px 13px; border-radius: 10px; background: #2563eb; color: white; cursor: pointer; font-size: .9rem; font-weight: 700; }
@@ -57,7 +61,9 @@ h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.4rem); letter-spacing: -.045em; }
 .secondary-button:hover { background: #f1f5f9; }
 
 .card-list { display: grid; gap: 12px; margin-top: 20px; }
-.row-card { padding: 18px 20px; border: 1px solid #cbd5e1; border-radius: 12px; background: white; box-shadow: 0 1px 2px rgb(15 23 42 / 5%); overflow-wrap: anywhere; }
+.row-card { position: relative; z-index: 3; padding: 18px 20px; border: 1px solid #cbd5e1; border-radius: 12px; background: white; box-shadow: 0 1px 2px rgb(15 23 42 / 5%); overflow-wrap: anywhere; transition: border-color .15s, box-shadow .15s, opacity .15s; }
+.row-card.relationship-active { border-color: #2563eb; box-shadow: 0 0 0 3px rgb(37 99 235 / 16%); }
+.row-card.relationship-muted { opacity: .3; }
 .field-value + .field-value { margin-top: 8px; }
 .field-value strong { color: #0f172a; }
 .empty-state { margin: 0; padding: 24px; border: 1px dashed #94a3b8; border-radius: 12px; color: #64748b; text-align: center; }
@@ -65,6 +71,7 @@ h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.4rem); letter-spacing: -.045em; }
 @media (max-width: 560px) {
   .app-shell { padding-top: 40px; }
   .viewers { grid-template-columns: 1fr; }
+  .relationship-lines { display: none; }
   .viewer-header { align-items: flex-start; flex-direction: column; }
   .relationship-controls, .relationship-selectors { align-items: flex-start; flex-direction: column; }
   .relationship-equals { align-self: center; padding: 0; }
