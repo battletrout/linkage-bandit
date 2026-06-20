@@ -8,54 +8,63 @@
   </head>
   <body>
     <main class="app-shell">
-      <header>
-        <p class="eyebrow">Local CSV viewer</p>
+      <header class="page-header">
+        <p class="eyebrow">Local CSV comparer</p>
         <h1>Rows, neatly boxed.</h1>
-        <p class="intro">Choose a CSV file, then decide which fields appear in each row rectangle.</p>
+        <p class="intro">Load two CSV files side by side. Each file has its own fields, filters, and sorting.</p>
       </header>
 
-      <label class="file-picker" for="csv-file">
-        <span>Choose a .csv file</span>
-        <input id="csv-file" type="file" accept=".csv,text/csv" />
-      </label>
-      <p id="status" class="status" aria-live="polite">No file selected.</p>
-
-      <section id="field-controls" class="field-controls" hidden aria-labelledby="field-heading">
-        <div class="field-controls__heading">
-          <h2 id="field-heading">Fields to display</h2>
-          <div class="field-actions">
-            <button id="select-all" type="button">Select all</button>
-            <button id="clear-all" type="button">Clear all</button>
-          </div>
-        </div>
-        <div id="field-list" class="field-list"></div>
-      </section>
-
-      <section id="data-controls" class="data-controls" hidden aria-label="Filter and sort rows">
-        <label>
-          Filter field
-          <select id="filter-field"></select>
-        </label>
-        <label class="filter-search">
-          Contains
-          <input id="filter-value" type="search" placeholder="Type to filter…" />
-        </label>
-        <button id="clear-filter" class="secondary-button" type="button">Clear filter</button>
-        <label>
-          Sort by
-          <select id="sort-field"></select>
-        </label>
-        <label>
-          Direction
-          <select id="sort-direction">
-            <option value="asc">A–Z / low–high</option>
-            <option value="desc">Z–A / high–low</option>
-          </select>
-        </label>
-      </section>
-
-      <section id="card-list" class="card-list" aria-label="CSV rows"></section>
+      <div id="viewers" class="viewers"></div>
     </main>
+
+    <template id="viewer-template">
+      <section class="viewer" aria-label="CSV viewer">
+        <header class="viewer-header">
+          <h2 class="viewer-title"></h2>
+          <label class="file-picker">
+            <span>Choose a .csv file</span>
+            <input class="csv-file" type="file" accept=".csv,text/csv" />
+          </label>
+        </header>
+        <p class="status" aria-live="polite">No file selected.</p>
+
+        <section class="field-controls" hidden>
+          <div class="field-controls__heading">
+            <h3>Fields to display</h3>
+            <div class="field-actions">
+              <button class="select-all" type="button">Select all</button>
+              <button class="clear-all" type="button">Clear all</button>
+            </div>
+          </div>
+          <div class="field-list"></div>
+        </section>
+
+        <section class="data-controls" hidden aria-label="Filter and sort rows">
+          <label>
+            Filter field
+            <select class="filter-field"></select>
+          </label>
+          <label class="filter-search">
+            Contains
+            <input class="filter-value" type="search" placeholder="Type to filter…" />
+          </label>
+          <button class="clear-filter secondary-button" type="button">Clear filter</button>
+          <label>
+            Sort by
+            <select class="sort-field"></select>
+          </label>
+          <label>
+            Direction
+            <select class="sort-direction">
+              <option value="asc">A–Z / low–high</option>
+              <option value="desc">Z–A / high–low</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="card-list" aria-label="CSV rows"></section>
+      </section>
+    </template>
     <script src="app.js"></script>
   </body>
 </html>
