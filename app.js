@@ -844,6 +844,7 @@ function drawRelationshipLines() {
   relationshipLines.replaceChildren();
   if (!leftViewer?.headers.length || !rightViewer?.headers.length) return;
 
+  groupCardsForLinkageLayout();
   alignLinkageGroups();
   const canvas = viewers.getBoundingClientRect();
   relationshipLines.setAttribute('width', canvas.width);
@@ -879,6 +880,29 @@ function drawRelationshipLines() {
       }));
     });
   }
+}
+
+function groupCardsForLinkageLayout() {
+  if (linkageLayout.value === 'none') return;
+  const [leftViewer, rightViewer] = csvViewers;
+  const anchorViewer = linkageLayout.value === 'anchor-a' ? leftViewer : rightViewer;
+  const groupedViewer = anchorViewer === leftViewer ? rightViewer : leftViewer;
+  const anchorCards = [...anchorViewer.cardList.querySelectorAll('.row-card')];
+  const groupedCards = [...groupedViewer.cardList.querySelectorAll('.row-card')];
+  const correctlyOrderedCards = [];
+  const unmatchedCards = [...groupedCards];
+  anchorCards.forEach(anchorCard => {
+    const matches = [];
+    for (let index = unmatchedCards.length - 1; index >= 0; index -= 1) {
+      if (rowsAreLinked(anchorCard.recordValues, anchorViewer.side, unmatchedCards[index].recordValues, groupedViewer.side)) {
+        matches.unshift(unmatchedCards[index]);
+        unmatchedCards.splice(index, 1);
+      }
+    }
+    correctlyOrderedCards.push(...matches);
+  });
+  correctlyOrderedCards.push(...unmatchedCards);
+  correctlyOrderedCards.forEach(card => groupedViewer.cardList.append(card));
 }
 
 function getCardsByRecord(cardList) {
