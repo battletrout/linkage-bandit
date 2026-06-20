@@ -56,10 +56,14 @@
           <h2 class="viewer-title"></h2>
           <div class="viewer-actions">
             <label class="file-picker">
-              <span>Choose a .csv file</span>
-              <input class="csv-file" type="file" accept=".csv,text/csv" />
+              <span>Choose a CSV or JSON file</span>
+              <input class="csv-file" type="file" accept=".csv,.json,text/csv,application/json" />
             </label>
-            <button class="download-json secondary-button" type="button" hidden>Download JSON</button>
+            <select class="export-format" aria-label="Export format" hidden>
+              <option value="json">JSON</option>
+              <option value="csv">CSV</option>
+            </select>
+            <button class="download-file secondary-button" type="button" hidden>Download JSON</button>
           </div>
         </header>
         <p class="status" aria-live="polite">No file selected.</p>

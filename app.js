@@ -35,7 +35,8 @@ class CsvViewer {
     this.filterValue = element.querySelector('.filter-value');
     this.sortField = element.querySelector('.sort-field');
     this.sortDirection = element.querySelector('.sort-direction');
-    this.downloadJsonButton = element.querySelector('.download-json');
+    this.exportFormat = element.querySelector('.export-format');
+    this.downloadFileButton = element.querySelector('.download-file');
     element.querySelector('.viewer-title').textContent = title;
 
     this.fileInput.addEventListener('change', () => this.loadFile());
@@ -45,7 +46,8 @@ class CsvViewer {
     this.filterValue.addEventListener('input', () => this.updateDisplay());
     this.sortField.addEventListener('change', () => this.updateDisplay());
     this.sortDirection.addEventListener('change', () => this.updateDisplay());
-    this.downloadJsonButton.addEventListener('click', () => this.downloadJson());
+    this.exportFormat.addEventListener('change', () => this.updateExportButton());
+    this.downloadFileButton.addEventListener('click', () => this.downloadFile());
     element.querySelector('.clear-filter').addEventListener('click', () => {
       this.filterValue.value = '';
       this.updateDisplay();
@@ -62,7 +64,8 @@ class CsvViewer {
     this.dataRows = [];
     this.fileName = '';
     this.rawCsv = '';
-    this.downloadJsonButton.hidden = true;
+    this.exportFormat.hidden = true;
+    this.downloadFileButton.hidden = true;
     updateRelationshipControls();
 
     if (!file) {
@@ -71,7 +74,8 @@ class CsvViewer {
     }
 
     try {
-      this.rawCsv = await file.text();
+      const importedText = await file.text();
+      this.rawCsv = getImportedCsv(file.name, importedText);
       const rows = parseCsv(this.rawCsv);
       if (rows.length < 2 || !rows[0].some(header => header.trim())) {
         throw new Error('The CSV needs a header row and at least one data row.');
@@ -79,13 +83,15 @@ class CsvViewer {
 
       this.headers = rows[0].map((header, index) => header.trim() || `Column ${index + 1}`);
       this.dataRows = rows.slice(1).filter(row => row.some(value => value.trim() !== ''));
-      this.fileName = getCrossPlatformFileName(file.name);
+      this.fileName = getImportedFileName(file.name, importedText);
       this.buildFieldPicker();
       this.buildDataControls();
       this.renderCards();
       this.fieldControls.hidden = false;
       this.dataControls.hidden = false;
-      this.downloadJsonButton.hidden = false;
+      this.exportFormat.hidden = false;
+      this.downloadFileButton.hidden = false;
+      this.updateExportButton();
       updateRelationshipControls();
       scheduleRelationshipLineUpdate();
     } catch (error) {
@@ -196,17 +202,22 @@ class CsvViewer {
     return groupRowsByRelationship(baseRows, thisRelationshipField, anchorKeys);
   }
 
-  downloadJson() {
-    const losslessJson = {
-      format: 'csv-json-lossless-v1',
-      sourceFileName: this.fileName,
-      csv: this.rawCsv,
-    };
-    const jsonFile = new Blob([JSON.stringify(losslessJson, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(jsonFile);
+  updateExportButton() {
+    this.downloadFileButton.textContent = `Download ${this.exportFormat.value.toUpperCase()}`;
+  }
+
+  downloadFile() {
+    const exportingJson = this.exportFormat.value === 'json';
+    const contents = exportingJson
+      ? JSON.stringify({ format: 'csv-json-lossless-v1', sourceFileName: this.fileName, csv: this.rawCsv }, null, 2)
+      : this.rawCsv;
+    const exportedFile = new Blob([contents], {
+      type: exportingJson ? 'application/json' : 'text/csv;charset=utf-8',
+    });
+    const url = URL.createObjectURL(exportedFile);
     const download = document.createElement('a');
     download.href = url;
-    download.download = getJsonFileName(this.fileName);
+    download.download = getFileNameWithExtension(this.fileName, exportingJson ? 'json' : 'csv');
     download.click();
     setTimeout(() => URL.revokeObjectURL(url), 0);
   }
@@ -373,10 +384,34 @@ function getCrossPlatformFileName(filePath) {
   return fileName || 'untitled.csv';
 }
 
-function getJsonFileName(filePath) {
+function getFileNameWithExtension(filePath, extension) {
   const fileName = getCrossPlatformFileName(filePath);
   const baseName = fileName.replace(/\.[^.]*$/, '');
-  return `${baseName || 'untitled'}.json`;
+  return `${baseName || 'untitled'}.${extension}`;
+}
+
+function getImportedCsv(fileName, contents) {
+  if (!/\.json$/i.test(fileName)) return contents;
+  let json;
+  try {
+    json = JSON.parse(contents);
+  } catch {
+    throw new Error('The JSON file is not valid JSON.');
+  }
+  if (json?.format !== 'csv-json-lossless-v1' || typeof json.csv !== 'string') {
+    throw new Error('JSON imports must use the lossless JSON format exported by this app.');
+  }
+  return json.csv;
+}
+
+function getImportedFileName(fileName, contents) {
+  if (!/\.json$/i.test(fileName)) return getCrossPlatformFileName(fileName);
+  try {
+    const sourceFileName = JSON.parse(contents)?.sourceFileName;
+    return getCrossPlatformFileName(sourceFileName || fileName.replace(/\.json$/i, '.csv'));
+  } catch {
+    return getCrossPlatformFileName(fileName.replace(/\.json$/i, '.csv'));
+  }
 }
 
 function compareValues(first, second) {
