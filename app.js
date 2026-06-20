@@ -6,6 +6,7 @@ const rightMatchField = document.querySelector('#right-match-field');
 const relationshipLines = document.querySelector('#relationship-lines');
 const connectionSpace = document.querySelector('#connection-space');
 const connectionSpaceValue = document.querySelector('#connection-space-value');
+const linkageLayout = document.querySelector('#linkage-layout');
 const csvViewers = [];
 let relationshipLineFrame;
 
@@ -38,13 +39,13 @@ class CsvViewer {
     this.fileInput.addEventListener('change', () => this.loadFile());
     element.querySelector('.select-all').addEventListener('click', () => this.setAllFields(true));
     element.querySelector('.clear-all').addEventListener('click', () => this.setAllFields(false));
-    this.filterField.addEventListener('change', () => this.renderCards());
-    this.filterValue.addEventListener('input', () => this.renderCards());
-    this.sortField.addEventListener('change', () => this.renderCards());
-    this.sortDirection.addEventListener('change', () => this.renderCards());
+    this.filterField.addEventListener('change', () => this.updateDisplay());
+    this.filterValue.addEventListener('input', () => this.updateDisplay());
+    this.sortField.addEventListener('change', () => this.updateDisplay());
+    this.sortDirection.addEventListener('change', () => this.updateDisplay());
     element.querySelector('.clear-filter').addEventListener('click', () => {
       this.filterValue.value = '';
-      this.renderCards();
+      this.updateDisplay();
     });
   }
 
@@ -95,7 +96,7 @@ class CsvViewer {
       checkbox.type = 'checkbox';
       checkbox.value = index;
       checkbox.checked = true;
-      checkbox.addEventListener('change', () => this.renderCards());
+      checkbox.addEventListener('change', () => this.updateDisplay());
       option.className = 'field-option';
       option.append(checkbox, document.createTextNode(header));
       this.fieldList.append(option);
@@ -113,20 +114,18 @@ class CsvViewer {
 
   setAllFields(checked) {
     this.fieldList.querySelectorAll('input').forEach(input => { input.checked = checked; });
-    this.renderCards();
+    this.updateDisplay();
+  }
+
+  updateDisplay() {
+    const bothFilesLoaded = csvViewers[0]?.headers.length && csvViewers[1]?.headers.length;
+    if (linkageLayout.value !== 'none' && bothFilesLoaded) refreshRelationshipDisplay();
+    else this.renderCards();
   }
 
   renderCards() {
     const selectedFields = [...this.fieldList.querySelectorAll('input:checked')].map(input => Number(input.value));
-    const filterIndex = Number(this.filterField.value);
-    const sortIndex = Number(this.sortField.value);
-    const query = this.filterValue.value.trim().toLocaleLowerCase();
-    const direction = this.sortDirection.value === 'desc' ? -1 : 1;
-    const visibleRows = this.dataRows
-      .filter(row => !query || (row[filterIndex] ?? '').toLocaleLowerCase().includes(query))
-      .map((row, index) => ({ row, index }))
-      .sort((a, b) => compareValues(a.row[sortIndex], b.row[sortIndex]) * direction || a.index - b.index)
-      .map(item => item.row);
+    const visibleRows = this.getRowsForDisplay();
 
     const relationshipField = this === csvViewers[0] ? Number(leftMatchField.value) : Number(rightMatchField.value);
     const canDrawRelationships = csvViewers[0]?.headers.length && csvViewers[1]?.headers.length;
@@ -160,6 +159,35 @@ class CsvViewer {
     this.status.textContent = `${visibleRows.length} of ${this.dataRows.length} row${this.dataRows.length === 1 ? '' : 's'} shown from ${this.fileName}.`;
     scheduleRelationshipLineUpdate();
   }
+
+  getBaseRows() {
+    const filterIndex = Number(this.filterField.value);
+    const sortIndex = Number(this.sortField.value);
+    const query = this.filterValue.value.trim().toLocaleLowerCase();
+    const direction = this.sortDirection.value === 'desc' ? -1 : 1;
+    return this.dataRows
+      .filter(row => !query || (row[filterIndex] ?? '').toLocaleLowerCase().includes(query))
+      .map((row, index) => ({ row, index }))
+      .sort((a, b) => compareValues(a.row[sortIndex], b.row[sortIndex]) * direction || a.index - b.index)
+      .map(item => item.row);
+  }
+
+  getRowsForDisplay() {
+    const baseRows = this.getBaseRows();
+    const [leftViewer, rightViewer] = csvViewers;
+    const isLinkedLayout = linkageLayout.value !== 'none' && leftViewer?.headers.length && rightViewer?.headers.length;
+    const thisIsAnchor = (linkageLayout.value === 'anchor-a' && this === leftViewer)
+      || (linkageLayout.value === 'anchor-b' && this === rightViewer);
+    if (!isLinkedLayout || thisIsAnchor) return baseRows;
+
+    const anchorViewer = linkageLayout.value === 'anchor-a' ? leftViewer : rightViewer;
+    const thisRelationshipField = this === leftViewer ? Number(leftMatchField.value) : Number(rightMatchField.value);
+    const anchorRelationshipField = anchorViewer === leftViewer ? Number(leftMatchField.value) : Number(rightMatchField.value);
+    const anchorKeys = anchorViewer.getBaseRows()
+      .map(row => normalizeRelationshipValue(row[anchorRelationshipField]))
+      .filter((key, index, keys) => key && keys.indexOf(key) === index);
+    return groupRowsByRelationship(baseRows, thisRelationshipField, anchorKeys);
+  }
 }
 
 createViewer('CSV A');
@@ -167,6 +195,7 @@ createViewer('CSV B');
 
 leftMatchField.addEventListener('change', refreshRelationshipDisplay);
 rightMatchField.addEventListener('change', refreshRelationshipDisplay);
+linkageLayout.addEventListener('change', refreshRelationshipDisplay);
 connectionSpace.addEventListener('input', () => {
   viewers.style.setProperty('--connection-gap', `${connectionSpace.value}px`);
   connectionSpaceValue.textContent = `${connectionSpace.value} px`;
@@ -211,6 +240,7 @@ function drawRelationshipLines() {
   relationshipLines.replaceChildren();
   if (!leftViewer?.headers.length || !rightViewer?.headers.length) return;
 
+  alignLinkageGroups();
   const canvas = viewers.getBoundingClientRect();
   relationshipLines.setAttribute('width', canvas.width);
   relationshipLines.setAttribute('height', canvas.height);
@@ -230,6 +260,53 @@ function drawRelationshipLines() {
     if (!key) return;
     const rightCards = rightCardsByKey.get(key) ?? [];
     rightCards.forEach(rightCard => addRelationshipLine(leftCard, rightCard, key, canvas));
+  });
+}
+
+function groupRowsByRelationship(rows, fieldIndex, relationshipOrder) {
+  const rowsByKey = new Map();
+  const unlinkedRows = [];
+  rows.forEach(row => {
+    const key = normalizeRelationshipValue(row[fieldIndex]);
+    if (!key) {
+      unlinkedRows.push(row);
+      return;
+    }
+    const group = rowsByKey.get(key) ?? [];
+    group.push(row);
+    rowsByKey.set(key, group);
+  });
+  const orderedRows = relationshipOrder.flatMap(key => rowsByKey.get(key) ?? []);
+  const orderedKeys = new Set(relationshipOrder);
+  rowsByKey.forEach((group, key) => {
+    if (!orderedKeys.has(key)) orderedRows.push(...group);
+  });
+  return [...orderedRows, ...unlinkedRows];
+}
+
+function alignLinkageGroups() {
+  const [leftViewer, rightViewer] = csvViewers;
+  leftViewer.cardList.querySelectorAll('.row-card').forEach(card => { card.style.marginTop = ''; });
+  rightViewer.cardList.querySelectorAll('.row-card').forEach(card => { card.style.marginTop = ''; });
+  if (linkageLayout.value === 'none') return;
+
+  const anchorViewer = linkageLayout.value === 'anchor-a' ? leftViewer : rightViewer;
+  const groupedViewer = anchorViewer === leftViewer ? rightViewer : leftViewer;
+  const firstGroupedCardByKey = new Map();
+  groupedViewer.cardList.querySelectorAll('.row-card[data-relationship-key]').forEach(card => {
+    const key = card.dataset.relationshipKey;
+    if (key && !firstGroupedCardByKey.has(key)) firstGroupedCardByKey.set(key, card);
+  });
+
+  const alignedKeys = new Set();
+  anchorViewer.cardList.querySelectorAll('.row-card[data-relationship-key]').forEach(anchorCard => {
+    const key = anchorCard.dataset.relationshipKey;
+    const groupedCard = firstGroupedCardByKey.get(key);
+    if (!key || !groupedCard || alignedKeys.has(key)) return;
+    alignedKeys.add(key);
+    const offset = groupedCard.getBoundingClientRect().top - anchorCard.getBoundingClientRect().top;
+    if (offset > 1) anchorCard.style.marginTop = `${offset}px`;
+    if (offset < -1) groupedCard.style.marginTop = `${Math.abs(offset)}px`;
   });
 }
 
