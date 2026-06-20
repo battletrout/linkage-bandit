@@ -150,9 +150,10 @@ class CsvViewer {
 
     try {
       const importedText = await file.text();
-      this.rawCsv = getImportedCsv(file.name, importedText);
-      this.delimiter = resolveImportDelimiter(this.delimiterChoice.value, this.customDelimiter.value, file.name, importedText, this.rawCsv);
-      const rows = parseCsv(this.rawCsv, this.delimiter);
+      const imported = getImportedFile(file.name, importedText);
+      this.delimiter = resolveImportDelimiter(this.delimiterChoice.value, this.customDelimiter.value, file.name, importedText, imported.csv);
+      const rows = imported.rows ?? parseCsv(imported.csv, this.delimiter);
+      this.rawCsv = serializeCsv(rows[0] ?? [], rows.slice(1), this.delimiter);
       if (rows.length < 2 || !rows[0].some(header => header.trim())) {
         throw new Error('The CSV needs a header row and at least one data row.');
       }
@@ -337,11 +338,16 @@ class CsvViewer {
     const exportingJson = this.exportFormat.value === 'json';
     const integrating = this.exportContent.value === 'integrated';
     if (integrating && !confirmIntegratedExport()) return;
-    const csv = integrating
-      ? serializeCsv(this.headers, buildIntegratedRows(this), this.delimiter)
-      : this.rawCsv;
+    const rows = integrating ? buildIntegratedRows(this) : this.dataRows;
+    const csv = serializeCsv(this.headers, rows, this.delimiter);
     const contents = exportingJson
-      ? JSON.stringify({ format: 'csv-json-lossless-v1', sourceFileName: this.fileName, delimiter: this.delimiter, csv }, null, 2)
+      ? JSON.stringify({
+        format: 'csv-json-lossless-v1',
+        sourceFileName: this.fileName,
+        delimiter: this.delimiter,
+        headers: this.headers,
+        data: rows.map(row => Object.fromEntries(this.headers.map((header, index) => [header, row[index] ?? '']))),
+      }, null, 2)
       : csv;
     const exportedFile = new Blob([contents], {
       type: exportingJson ? 'application/json' : 'text/csv;charset=utf-8',
@@ -1461,18 +1467,26 @@ function serializeCsv(headers, rows, delimiter = ',') {
   return [headers, ...rows].map(row => row.map(encodeCell).join(delimiter)).join('\r\n');
 }
 
-function getImportedCsv(fileName, contents) {
-  if (!/\.json$/i.test(fileName)) return contents;
+function getImportedFile(fileName, contents) {
+  if (!/\.json$/i.test(fileName)) return { csv: contents };
   let json;
   try {
     json = JSON.parse(contents);
   } catch {
     throw new Error('The JSON file is not valid JSON.');
   }
-  if (json?.format !== 'csv-json-lossless-v1' || typeof json.csv !== 'string') {
-    throw new Error('JSON imports must use the lossless JSON format exported by this app.');
+  if (json?.format !== 'csv-json-lossless-v1') {
+    throw new Error('JSON imports must use the csv-json-lossless-v1 format exported by this app.');
   }
-  return json.csv;
+  if (typeof json.csv === 'string') return { csv: json.csv };
+
+  const records = Array.isArray(json.data) ? json.data : json.data && typeof json.data === 'object' ? [json.data] : [];
+  const headers = Array.isArray(json.headers) ? json.headers : Object.keys(records[0] ?? {});
+  if (!headers.length || !records.length) {
+    throw new Error('The JSON file needs a headers array and at least one data record.');
+  }
+  const rows = [headers, ...records.map(record => headers.map(header => String(record?.[header] ?? '')))];
+  return { csv: serializeCsv(headers, rows.slice(1), json.delimiter || ','), rows };
 }
 
 function getImportedDelimiter(fileName, contents, csv) {
