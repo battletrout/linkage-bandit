@@ -353,7 +353,7 @@ async function loadChangesFile() {
 }
 
 function downloadChangesFile() {
-  downloadTextFile('changes.json', JSON.stringify({ format: 'changes-v1', manualLinks }, null, 2));
+  downloadTextFile(getWorkspaceFileName('changes'), JSON.stringify({ format: 'changes-v1', manualLinks }, null, 2));
 }
 
 async function loadConfigurationFile() {
@@ -392,7 +392,14 @@ function downloadConfigurationFile() {
       clearSelection: hotkeyClearSelection.value,
     },
   };
-  downloadTextFile('config.json', JSON.stringify(configuration, null, 2));
+  downloadTextFile(getWorkspaceFileName('config'), JSON.stringify(configuration, null, 2));
+}
+
+function getWorkspaceFileName(extension) {
+  const [leftViewer, rightViewer] = csvViewers;
+  const leftName = getFileNameWithExtension(leftViewer?.fileName || 'left', '');
+  const rightName = getFileNameWithExtension(rightViewer?.fileName || 'right', '');
+  return `${leftName}--${rightName}.${extension}`;
 }
 
 function getViewerConfiguration(viewer) {
@@ -662,9 +669,13 @@ function getCrossPlatformFileName(filePath) {
 }
 
 function getFileNameWithExtension(filePath, extension) {
+  const baseName = getFileStem(filePath);
+  return extension ? `${baseName}.${extension}` : baseName;
+}
+
+function getFileStem(filePath) {
   const fileName = getCrossPlatformFileName(filePath);
-  const baseName = fileName.replace(/\.[^.]*$/, '');
-  return `${baseName || 'untitled'}.${extension}`;
+  return fileName.replace(/\.[^.]*$/, '') || 'untitled';
 }
 
 function getImportedCsv(fileName, contents) {
